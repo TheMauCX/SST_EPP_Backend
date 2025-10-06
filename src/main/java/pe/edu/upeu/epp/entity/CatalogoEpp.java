@@ -11,12 +11,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "catalogo_epp")
-@EntityListeners(AuditingEntityListener.class)
-@Data // Incluye @Getter, @Setter, @ToString, @EqualsAndHashCode
-@NoArgsConstructor // Constructor vacío
-@AllArgsConstructor // Constructor con todos los campos
-@RequiredArgsConstructor // Constructor con campos @NonNull
+@Table(name = "catalogo_epp", schema = "epp", indexes = {
+        @Index(name = "idx_catalogo_epp_tipo_uso", columnList = "tipo_uso"),
+        @Index(name = "idx_catalogo_epp_activo", columnList = "activo")
+})
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CatalogoEpp {
 
     @Id
@@ -27,11 +26,9 @@ public class CatalogoEpp {
     @NotNull
     @Size(max = 100)
     @Column(name = "nombre_epp", nullable = false, length = 100)
-    @NonNull
     private String nombreEpp;
 
     @Column(name = "codigo_identificacion", unique = true, length = 50)
-    @NonNull
     private String codigoIdentificacion;
 
     @Column(name = "especificaciones_tecnicas", columnDefinition = "TEXT")
@@ -39,8 +36,7 @@ public class CatalogoEpp {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_uso", length = 20)
-    @NonNull
+    @Column(name = "tipo_uso", nullable = false, length = 20)
     private TipoUso tipoUso;
 
     @Column(name = "vida_util_meses")
@@ -49,19 +45,28 @@ public class CatalogoEpp {
     @Column(name = "nivel_proteccion", length = 50)
     private String nivelProteccion;
 
-    @CreatedDate
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
-    @LastModifiedDate
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
     @Column(name = "activo")
     private Boolean activo = true;
-}
 
+    @PrePersist
+    protected void onCreate() {
+        fechaCreacion = LocalDateTime.now();
+        fechaActualizacion = LocalDateTime.now();
+        if (activo == null) activo = true;
+    }
 
-enum TipoUso {
-    CONSUMIBLE, DURADERO
+    @PreUpdate
+    protected void onUpdate() {
+        fechaActualizacion = LocalDateTime.now();
+    }
+
+    public enum TipoUso {
+        CONSUMIBLE, DURADERO
+    }
 }

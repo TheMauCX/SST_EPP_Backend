@@ -1,0 +1,24 @@
+package pe.edu.upeu.epp.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import pe.edu.upeu.epp.entity.CatalogoEpp;
+
+import java.util.List;
+import java.util.Optional;
+
+// ==================== CATALOGO EPP REPOSITORY ====================
+@Repository
+public interface CatalogoEppRepository extends JpaRepository<CatalogoEpp, Integer>,
+        JpaSpecificationExecutor<CatalogoEpp> {
+    Optional<CatalogoEpp> findByCodigoIdentificacion(String codigoIdentificacion);
+    List<CatalogoEpp> findByTipoUso(CatalogoEpp.TipoUso tipoUso);
+    List<CatalogoEpp> findByActivoTrue();
+    boolean existsByCodigoIdentificacion(String codigoIdentificacion);
+
+    @Query("SELECT c FROM CatalogoEpp c WHERE LOWER(c.nombreEpp) LIKE LOWER(CONCAT('%', :nombre, '%')) AND c.activo = true")
+    List<CatalogoEpp> buscarPorNombreActivo(@Param("nombre") String nombre);
+}
