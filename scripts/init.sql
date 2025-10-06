@@ -12,6 +12,21 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE SCHEMA IF NOT EXISTS epp;
 SET search_path TO epp, public;
 
+-- Asegurar que el usuario epp_user existe y tiene permisos
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'epp_user') THEN
+        CREATE USER epp_user WITH PASSWORD 'dev_password';
+END IF;
+END
+$$;
+
+-- Dar permisos completos al usuario
+GRANT ALL PRIVILEGES ON DATABASE epp_db TO epp_user;
+GRANT ALL PRIVILEGES ON SCHEMA epp TO epp_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA epp TO epp_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA epp TO epp_user;
+
 -- ============================================
 -- TABLAS MAESTRAS
 -- ============================================
@@ -32,8 +47,6 @@ CREATE TABLE catalogo_epp (
 
 CREATE INDEX idx_catalogo_epp_tipo_uso ON catalogo_epp(tipo_uso);
 CREATE INDEX idx_catalogo_epp_activo ON catalogo_epp(activo);
-
-COMMENT ON TABLE catalogo_epp IS 'Catálogo maestro de tipos de EPP disponibles';
 
 -- Tabla: AREA
 CREATE TABLE area (

@@ -10,7 +10,7 @@
     </parent>
     <groupId>pe.edu.upeu</groupId>
     <artifactId>epp</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>SST_EPP_Backend</name>
     <description>Plataforma de Gestión de EPP - UPEU</description>
     <url/>
@@ -27,6 +27,8 @@
         <url/>
     </scm>
     <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>

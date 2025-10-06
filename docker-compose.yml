@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: epp_db
       POSTGRES_USER: epp_user
-      POSTGRES_PASSWORD: dev_password
+      POSTGRES_PASSWORD: password123  # Contraseña simple
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
@@ -19,42 +19,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - epp_network
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: epp_backend
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: epp_db
-      DB_USERNAME: epp_user
-      DB_PASSWORD: dev_password
-      JWT_SECRET: dev-secret-key-change-in-production-256-bits-longer-key-here
-      SPRING_PROFILES_ACTIVE: dev
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - epp_network
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: epp_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@upeu.edu.pe
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
     networks:
       - epp_network
 
