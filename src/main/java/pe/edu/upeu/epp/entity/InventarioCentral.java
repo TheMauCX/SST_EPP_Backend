@@ -11,12 +11,20 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "inventario_central", schema = "epp",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"epp_id", "lote"}),
+        // CORREGIDO: Hibernate necesita los nombres exactos de las columnas SQL
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_inventario_central_epp_lote",
+                columnNames = {"epp_id", "lote"}
+        ),
         indexes = {
                 @Index(name = "idx_inv_central_epp", columnList = "epp_id"),
                 @Index(name = "idx_inv_central_vencimiento", columnList = "fecha_vencimiento")
         })
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class InventarioCentral {
 
     @Id
