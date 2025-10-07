@@ -7,15 +7,16 @@ spring:
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
+      connection-timeout: 30000
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update  # Hibernate crea/actualiza las tablas
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
-        default_schema: epp  # Usar esquema epp
+        default_schema: epp
         format_sql: true
         jdbc:
           lob:
@@ -23,29 +24,71 @@ spring:
 
   sql:
     init:
-      mode: always  # Ejecuta init.sql para datos iniciales
+      mode: always
 
+# ============================================
+# SEGURIDAD JWT
+# ============================================
 jwt:
-  secret: dev-secret-key-change-in-production-must-be-at-least-256-bits-long-for-hs256
-  expiration: 86400000
-  refresh-expiration: 604800000
+  # ⚠️ IMPORTANTE: El secret debe ser Base64 válido (sin guiones)
+  # Este secret tiene 64 caracteres (512 bits para HS512)
+  # En producción, usar: export JWT_SECRET="tu_secret_seguro_generado"
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  expiration: 86400000  # 24 horas en milisegundos
+  refresh-expiration: 604800000  # 7 días en milisegundos
 
+# ============================================
+# CORS
+# ============================================
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5354}
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+
+# ============================================
+# EMAIL (para recuperación de contraseña)
+# ============================================
+spring.mail:
+  host: ${SMTP_HOST:smtp.gmail.com}
+  port: ${SMTP_PORT:587}
+  username: ${SMTP_USERNAME:noreply@upeu.edu.pe}
+  password: ${SMTP_PASSWORD:}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+
+# ============================================
+# LOGGING
+# ============================================
 logging:
   level:
     root: INFO
     pe.edu.upeu.epp: DEBUG
     org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
+# ============================================
+# SERVER
+# ============================================
 server:
   port: 8080
   error:
     include-message: always
     include-stacktrace: on_param
 
+# ============================================
+# SWAGGER / OpenAPI
+# ============================================
 springdoc:
   api-docs:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+    tags-sorter: alpha

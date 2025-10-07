@@ -17,7 +17,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
     Optional<Usuario> findByEmail(String email);
     Optional<Usuario> findByTrabajador(Trabajador trabajador);
 
-    @Query("SELECT u FROM Usuario u JOIN FETCH u.roles WHERE u.nombreUsuario = :nombreUsuario AND u.activo = true")
+    @Query("SELECT u FROM Usuario u " +
+            "LEFT JOIN FETCH u.roles " +
+            "WHERE u.nombreUsuario = :nombreUsuario " +
+            "AND u.activo = true")
     Optional<Usuario> findByNombreUsuarioWithRoles(@Param("nombreUsuario") String nombreUsuario);
 
     @Query("SELECT u FROM Usuario u JOIN u.roles r WHERE r.nombreRol = :nombreRol AND u.activo = true")

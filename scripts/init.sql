@@ -60,7 +60,7 @@ VALUES ('00000001', 'Administrador', 'Sistema', 1, 'Administrador de Sistema', '
     ON CONFLICT (dni) DO NOTHING;
 
 INSERT INTO epp.usuario (nombre_usuario, contrasena_hash, email, trabajador_id, activo, fecha_creacion)
-VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMye1J8iYLfkYvmH5wJjXJqYvqLqCQmW7rK', 'admin@upeu.edu.pe', 1, TRUE, CURRENT_TIMESTAMP)
+VALUES ('admin', '$2a$10$aTgonSHOV/5ZLsf3J/7bLOE/wky1LDh8HCqeHpcfiptcMU8dGZ77G', 'admin@upeu.edu.pe', 1, TRUE, CURRENT_TIMESTAMP)
     ON CONFLICT (nombre_usuario) DO NOTHING;
 
 INSERT INTO epp.usuario_rol (usuario_id, rol_id, fecha_asignacion)
