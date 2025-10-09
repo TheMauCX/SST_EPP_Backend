@@ -14,16 +14,19 @@ import java.util.Optional;
 // ==================== INVENTARIO CENTRAL REPOSITORY ====================
 @Repository
 public interface InventarioCentralRepository extends JpaRepository<InventarioCentral, Integer> {
-    Optional<InventarioCentral> findByEpp(CatalogoEpp epp);
+    List<InventarioCentral> findByEpp(CatalogoEpp epp);
+
     Optional<InventarioCentral> findByEppAndLote(CatalogoEpp epp, String lote);
 
+    // Reemplaza el método derivado por una consulta explícita conservando el nombre original
     @Query("SELECT ic FROM InventarioCentral ic WHERE ic.epp.eppId = :eppId")
-    Optional<InventarioCentral> findByEppId(@Param("eppId") Integer eppId);
+    List<InventarioCentral> findByEppId(@Param("eppId") Integer eppId);
 
-    @Query("SELECT ic FROM InventarioCentral ic WHERE ic.cantidadActual <= ic.cantidadMinima")
+
+    @Query("SELECT ic FROM InventarioCentral ic WHERE ic.cantidadActual <= ic.cantidadMinima ORDER BY ic.cantidadActual ASC")
     List<InventarioCentral> findStockBajo();
 
-    @Query("SELECT ic FROM InventarioCentral ic WHERE ic.fechaVencimiento BETWEEN :fechaInicio AND :fechaFin")
-    List<InventarioCentral> findProximosAVencer(@Param("fechaInicio") LocalDate fechaInicio,
-                                                @Param("fechaFin") LocalDate fechaFin);
+    @Query("SELECT ic FROM InventarioCentral ic WHERE ic.fechaVencimiento IS NOT NULL " +
+            "AND ic.fechaVencimiento <= :fechaLimite ORDER BY ic.fechaVencimiento ASC")
+    List<InventarioCentral> findProximosAVencer(@Param("fechaLimite") LocalDate fechaLimite);
 }

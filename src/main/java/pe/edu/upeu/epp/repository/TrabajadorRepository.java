@@ -14,15 +14,20 @@ import java.util.Optional;
 @Repository
 public interface TrabajadorRepository extends JpaRepository<Trabajador, Integer> {
     Optional<Trabajador> findByDni(String dni);
-    Optional<Trabajador> findByCodigoQrPhotocheck(String codigoQr);
+
+    Optional<Trabajador> findByCodigoQrPhotocheck(String codigoQrPhotocheck);
+
+    List<Trabajador> findByArea(Area area);
+
     List<Trabajador> findByAreaAndEstado(Area area, Trabajador.EstadoTrabajador estado);
 
-    @Query("SELECT t FROM Trabajador t WHERE t.area.areaId = :areaId AND t.estado = 'ACTIVO'")
+    long countByAreaAndEstado(Area area, Trabajador.EstadoTrabajador estado);
+
+    @Query("SELECT t FROM Trabajador t WHERE t.area.areaId = :areaId AND t.estado = 'ACTIVO' ORDER BY t.apellidos, t.nombres")
     List<Trabajador> findTrabajadoresActivosPorArea(@Param("areaId") Integer areaId);
 
-    @Query("SELECT t FROM Trabajador t WHERE LOWER(t.nombres || ' ' || t.apellidos) LIKE LOWER(CONCAT('%', :nombre, '%'))")
+    @Query("SELECT t FROM Trabajador t WHERE " +
+            "LOWER(CONCAT(t.nombres, ' ', t.apellidos)) LIKE LOWER(CONCAT('%', :nombre, '%')) " +
+            "ORDER BY t.apellidos, t.nombres")
     List<Trabajador> buscarPorNombre(@Param("nombre") String nombre);
-
-    boolean existsByDni(String dni);
-    boolean existsByCodigoQrPhotocheck(String codigoQr);
 }

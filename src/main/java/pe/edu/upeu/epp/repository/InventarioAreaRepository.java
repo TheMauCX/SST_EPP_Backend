@@ -15,18 +15,22 @@ import java.util.Optional;
 @Repository
 public interface InventarioAreaRepository extends JpaRepository<InventarioArea, Integer> {
     Optional<InventarioArea> findByEppAndArea(CatalogoEpp epp, Area area);
+
     List<InventarioArea> findByArea(Area area);
 
+    // Reemplaza el método derivado por una consulta explícita conservando el nombre original
     @Query("SELECT ia FROM InventarioArea ia WHERE ia.epp.eppId = :eppId AND ia.area.areaId = :areaId")
-    Optional<InventarioArea> findByEppIdAndAreaId(@Param("eppId") Integer eppId,
-                                                  @Param("areaId") Integer areaId);
+    Optional<InventarioArea> findByEppIdAndAreaId(@Param("eppId") Integer eppId, @Param("areaId") Integer areaId);
 
+    // Reemplaza el método derivado por una consulta explícita conservando el nombre original
     @Query("SELECT ia FROM InventarioArea ia WHERE ia.area.areaId = :areaId")
     List<InventarioArea> findByAreaId(@Param("areaId") Integer areaId);
 
-    @Query("SELECT ia FROM InventarioArea ia WHERE ia.area.areaId = :areaId AND ia.cantidadActual <= ia.cantidadMinima")
+    @Query("SELECT ia FROM InventarioArea ia WHERE ia.area.areaId = :areaId " +
+            "AND ia.cantidadActual <= ia.cantidadMinima ORDER BY ia.cantidadActual ASC")
     List<InventarioArea> findStockBajoPorArea(@Param("areaId") Integer areaId);
 
-    @Query("SELECT ia FROM InventarioArea ia WHERE ia.cantidadActual <= ia.cantidadMinima")
+    @Query("SELECT ia FROM InventarioArea ia WHERE ia.cantidadActual <= ia.cantidadMinima " +
+            "ORDER BY ia.area.nombreArea, ia.cantidadActual ASC")
     List<InventarioArea> findAllStockCritico();
 }
