@@ -21,4 +21,27 @@ public interface CatalogoEppRepository extends JpaRepository<CatalogoEpp, Intege
 
     @Query("SELECT c FROM CatalogoEpp c WHERE LOWER(c.nombreEpp) LIKE LOWER(CONCAT('%', :nombre, '%')) AND c.activo = true")
     List<CatalogoEpp> buscarPorNombreActivo(@Param("nombre") String nombre);
+    /**
+     * Buscar EPPs por marca.
+     */
+    @Query("SELECT c FROM CatalogoEpp c WHERE LOWER(c.marca) LIKE LOWER(CONCAT('%', :marca, '%')) AND c.activo = true")
+    List<CatalogoEpp> findByMarca(@Param("marca") String marca);
+
+    /**
+     * Listar todas las marcas distintas.
+     */
+    @Query("SELECT DISTINCT c.marca FROM CatalogoEpp c WHERE c.marca IS NOT NULL AND c.activo = true ORDER BY c.marca")
+    List<String> findAllMarcasDistinct();
+
+    /**
+     * Buscar EPPs por unidad de medida.
+     */
+    @Query("SELECT c FROM CatalogoEpp c WHERE c.unidadMedida = :unidadMedida AND c.activo = true")
+    List<CatalogoEpp> findByUnidadMedida(@Param("unidadMedida") String unidadMedida);
+
+    /**
+     * Listar todas las unidades de medida distintas.
+     */
+    @Query("SELECT DISTINCT c.unidadMedida FROM CatalogoEpp c WHERE c.unidadMedida IS NOT NULL AND c.activo = true ORDER BY c.unidadMedida")
+    List<String> findAllUnidadesMedidaDistinct();
 }

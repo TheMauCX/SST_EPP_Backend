@@ -50,6 +50,8 @@ public class CatalogoEppService {
                 .tipoUso(request.getTipoUso())
                 .vidaUtilMeses(request.getVidaUtilMeses())
                 .nivelProteccion(request.getNivelProteccion())
+                .marca(request.getMarca())
+                .unidadMedida(request.getUnidadMedida())
                 .activo(true)
                 .build();
 
@@ -152,6 +154,12 @@ public class CatalogoEppService {
         if (request.getActivo() != null) {
             catalogoEpp.setActivo(request.getActivo());
         }
+        if (request.getMarca() != null) {
+            catalogoEpp.setMarca(request.getMarca());
+        }
+        if (request.getUnidadMedida() != null) {
+            catalogoEpp.setUnidadMedida(request.getUnidadMedida());
+        }
 
         catalogoEpp = catalogoEppRepository.save(catalogoEpp);
 
@@ -192,6 +200,8 @@ public class CatalogoEppService {
                 .vidaUtilMeses(catalogoEpp.getVidaUtilMeses())
                 .nivelProteccion(catalogoEpp.getNivelProteccion())
                 .activo(catalogoEpp.getActivo())
+                .marca(catalogoEpp.getMarca())
+                .unidadMedida(catalogoEpp.getUnidadMedida())
                 .fechaCreacion(catalogoEpp.getFechaCreacion())
                 .fechaActualizacion(catalogoEpp.getFechaActualizacion())
                 .build();

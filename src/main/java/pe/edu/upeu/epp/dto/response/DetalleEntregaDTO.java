@@ -20,4 +20,7 @@ public class DetalleEntregaDTO {
     private Integer instanciaEppId; // Para DURADEROS
     private String codigoSerie; // Para DURADEROS
     private String motivo;
+
+    private String eppMarca;           // ← NUEVO
+    private String eppUnidadMedida;    // ← NUEVO
 }

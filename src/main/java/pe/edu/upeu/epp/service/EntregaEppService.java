@@ -321,6 +321,8 @@ public class EntregaEppService {
                 .detalleId(detalle.getDetalleId())
                 .eppId(detalle.getEpp().getEppId())
                 .eppNombre(detalle.getEpp().getNombreEpp())
+                .eppMarca(detalle.getEpp().getMarca())              // ← NUEVO
+                .eppUnidadMedida(detalle.getEpp().getUnidadMedida())// ← NUEVO
                 .tipoUso(detalle.getEpp().getTipoUso())
                 .cantidad(detalle.getCantidad())
                 .instanciaEppId(detalle.getInstanciaEpp() != null ? detalle.getInstanciaEpp().getInstanciaEppId() : null)

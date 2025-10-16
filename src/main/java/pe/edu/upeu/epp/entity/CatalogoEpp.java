@@ -54,6 +54,15 @@ public class CatalogoEpp {
     @Column(name = "activo")
     private Boolean activo = true;
 
+    @Column(name = "tallas", length = 100)
+    private String tallas;
+
+    @Column(name = "marca", length = 100)
+    private String marca;
+
+    @Column(name = "unidad_medida", length = 20)
+    private String unidadMedida;
+
     @PrePersist
     protected void onCreate() {
         fechaCreacion = LocalDateTime.now();

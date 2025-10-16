@@ -24,4 +24,6 @@ public class CatalogoEppResponseDTO {
     private Boolean activo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
+    private String marca;
+    private String unidadMedida;
 }
