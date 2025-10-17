@@ -13,6 +13,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class InventarioAreaUpdateDTO {
 
+    private Integer estadoId;
+
     @Min(value = 0, message = "La cantidad no puede ser negativa")
     private Integer cantidadActual;
 
@@ -24,4 +26,7 @@ public class InventarioAreaUpdateDTO {
 
     @Size(max = 100, message = "La ubicación no puede exceder 100 caracteres")
     private String ubicacion;
+
+    @Size(max = 500, message = "Las observaciones no pueden exceder 500 caracteres")
+    private String observaciones;
 }

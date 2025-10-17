@@ -7,14 +7,14 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "inventario_area", schema = "epp",
-        // CORREGIDO: usar nombres de atributos Java, no columnas SQL
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventario_area_epp_area",
-                columnNames = {"epp_id", "area_id"}
+                name = "uk_inventario_area_epp_area_estado",
+                columnNames = {"epp_id", "area_id", "estado_id"}
         ),
         indexes = {
                 @Index(name = "idx_inv_area_epp", columnList = "epp_id"),
-                @Index(name = "idx_inv_area_area", columnList = "area_id")
+                @Index(name = "idx_inv_area_area", columnList = "area_id"),
+                @Index(name = "idx_inv_area_estado", columnList = "estado_id")
         })
 @Getter
 @Setter
@@ -35,6 +35,10 @@ public class InventarioArea {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "area_id", nullable = false)
     private Area area;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "estado_id", nullable = false)
+    private EstadoEpp estado;
 
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
@@ -62,5 +66,18 @@ public class InventarioArea {
     @Transient
     public boolean necesitaReposicion() {
         return cantidadActual <= cantidadMinima;
+    }
+
+    @Transient
+    public boolean esStockUtilizable() {
+        return estado != null && Boolean.TRUE.equals(estado.getPermiteUso());
+    }
+
+    @Transient
+    public Integer calcularPorcentajeStock() {
+        if (cantidadMaxima == null || cantidadMaxima == 0) {
+            return null;
+        }
+        return (cantidadActual * 100) / cantidadMaxima;
     }
 }

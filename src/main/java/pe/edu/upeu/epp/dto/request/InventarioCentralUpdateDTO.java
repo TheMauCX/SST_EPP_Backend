@@ -18,6 +18,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class InventarioCentralUpdateDTO {
 
+    private Integer estadoId;
+
     @Min(value = 0, message = "La cantidad no puede ser negativa")
     private Integer cantidadActual;
 

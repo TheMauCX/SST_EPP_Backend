@@ -1,6 +1,3 @@
-// ============================================
-// InventarioCentralRequestDTO.java
-// ============================================
 package pe.edu.upeu.epp.dto.request;
 
 import jakarta.validation.constraints.*;
@@ -20,6 +17,9 @@ public class InventarioCentralRequestDTO {
 
     @NotNull(message = "El ID del EPP es obligatorio")
     private Integer eppId;
+
+    @NotNull(message = "El ID del estado es obligatorio")
+    private Integer estadoId;
 
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 0, message = "La cantidad no puede ser negativa")

@@ -12,7 +12,7 @@ public class PasswordHashGenerator {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
         // Contraseña a hashear
-        String password = "Admin123!";
+        String password = "Super123!";
 
         // Generar hash
         String hash = encoder.encode(password);

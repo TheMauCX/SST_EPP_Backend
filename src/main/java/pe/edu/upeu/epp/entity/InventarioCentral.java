@@ -1,23 +1,22 @@
 package pe.edu.upeu.epp.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "inventario_central", schema = "epp",
-        // CORREGIDO: Hibernate necesita los nombres exactos de las columnas SQL
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventario_central_epp_lote",
-                columnNames = {"epp_id", "lote"}
+                name = "uk_inventario_central_epp_lote_estado",
+                columnNames = {"epp_id", "lote", "estado_id"}
         ),
         indexes = {
                 @Index(name = "idx_inv_central_epp", columnList = "epp_id"),
+                @Index(name = "idx_inv_central_estado", columnList = "estado_id"),
                 @Index(name = "idx_inv_central_vencimiento", columnList = "fecha_vencimiento")
         })
 @Getter
@@ -35,6 +34,10 @@ public class InventarioCentral {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "epp_id", nullable = false)
     private CatalogoEpp epp;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "estado_id", nullable = false)
+    private EstadoEpp estado;
 
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
@@ -54,16 +57,16 @@ public class InventarioCentral {
     private String lote;
 
     @Column(name = "fecha_adquisicion")
-    private java.time.LocalDate fechaAdquisicion;
+    private LocalDate fechaAdquisicion;
 
     @Column(name = "costo_unitario")
-    private java.math.BigDecimal costoUnitario;
+    private BigDecimal costoUnitario;
 
     @Column(name = "proveedor", length = 200)
     private String proveedor;
 
     @Column(name = "fecha_vencimiento")
-    private java.time.LocalDate fechaVencimiento;
+    private LocalDate fechaVencimiento;
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;
@@ -80,5 +83,10 @@ public class InventarioCentral {
     @Transient
     public boolean necesitaReposicion() {
         return cantidadActual <= cantidadMinima;
+    }
+
+    @Transient
+    public boolean esStockUtilizable() {
+        return estado != null && Boolean.TRUE.equals(estado.getPermiteUso());
     }
 }

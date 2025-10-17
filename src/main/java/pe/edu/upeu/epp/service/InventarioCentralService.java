@@ -12,9 +12,11 @@ import pe.edu.upeu.epp.dto.request.InventarioCentralRequestDTO;
 import pe.edu.upeu.epp.dto.request.InventarioCentralUpdateDTO;
 import pe.edu.upeu.epp.dto.response.InventarioCentralResponseDTO;
 import pe.edu.upeu.epp.entity.CatalogoEpp;
+import pe.edu.upeu.epp.entity.EstadoEpp;
 import pe.edu.upeu.epp.entity.InventarioCentral;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.CatalogoEppRepository;
+import pe.edu.upeu.epp.repository.EstadoEppRepository;
 import pe.edu.upeu.epp.repository.InventarioCentralRepository;
 
 import java.time.LocalDate;
@@ -22,9 +24,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Servicio de lógica de negocio para Inventario Central.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,33 +31,38 @@ public class InventarioCentralService {
 
     private final InventarioCentralRepository inventarioCentralRepository;
     private final CatalogoEppRepository catalogoEppRepository;
+    private final EstadoEppRepository estadoEppRepository;
 
-    /**
-     * Registrar nuevo stock en inventario central.
-     */
     @Transactional
     public InventarioCentralResponseDTO crear(InventarioCentralRequestDTO request) {
-        log.info("Registrando nuevo stock en inventario central - EPP ID: {}, Lote: {}",
-                request.getEppId(), request.getLote());
+        log.info("Registrando nuevo stock en inventario central - EPP ID: {}, Lote: {}, Estado ID: {}",
+                request.getEppId(), request.getLote(), request.getEstadoId());
 
-        // Validar que el EPP exista
-        CatalogoEpp catalogoEpp = catalogoEppRepository.findById(request.getEppId())
+        CatalogoEpp epp = catalogoEppRepository.findById(request.getEppId())
                 .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + request.getEppId()));
 
-        // Validar que no exista un registro con el mismo EPP y lote
-        if (inventarioCentralRepository.findByEppAndLote(catalogoEpp, request.getLote()).isPresent()) {
-            throw new BusinessException("Ya existe un registro de inventario para el EPP " +
-                    catalogoEpp.getNombreEpp() + " con el lote: " + request.getLote());
+        EstadoEpp estado = estadoEppRepository.findById(request.getEstadoId())
+                .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
+
+        log.debug("Estado seleccionado: {} - Permite uso: {}", estado.getNombre(), estado.getPermiteUso());
+
+        if (!Boolean.TRUE.equals(estado.getPermiteUso())) {
+            log.warn("Se está registrando stock con estado que no permite uso: {}", estado.getNombre());
         }
 
-        // Validar cantidades
-        if (request.getCantidadMaxima() != null && request.getCantidadMaxima() < request.getCantidadMinima()) {
-            throw new BusinessException("La cantidad máxima no puede ser menor a la cantidad mínima");
-        }
+        inventarioCentralRepository.findByEppAndLote(epp, request.getLote())
+                .stream()
+                .filter(inv -> inv.getEstado().getEstadoId().equals(request.getEstadoId()))
+                .findFirst()
+                .ifPresent(inv -> {
+                    throw new BusinessException(
+                            String.format("Ya existe un registro de inventario para EPP '%s', lote '%s' y estado '%s'",
+                                    epp.getNombreEpp(), request.getLote(), estado.getNombre()));
+                });
 
-        // Crear entidad
         InventarioCentral inventario = InventarioCentral.builder()
-                .epp(catalogoEpp)
+                .epp(epp)
+                .estado(estado)
                 .cantidadActual(request.getCantidadActual())
                 .cantidadMinima(request.getCantidadMinima())
                 .cantidadMaxima(request.getCantidadMaxima())
@@ -73,18 +77,64 @@ public class InventarioCentralService {
 
         inventario = inventarioCentralRepository.save(inventario);
 
-        log.info("Stock registrado exitosamente - ID: {}, Cantidad: {}",
-                inventario.getInventarioCentralId(), inventario.getCantidadActual());
+        log.info("Stock registrado exitosamente - ID: {}, Estado: {}",
+                inventario.getInventarioCentralId(), estado.getNombre());
 
         return mapToResponseDTO(inventario);
     }
 
-    /**
-     * Obtener inventario por ID.
-     */
+    @Transactional
+    public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
+        log.info("Actualizando inventario central ID: {}", id);
+
+        InventarioCentral inventario = inventarioCentralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
+
+        if (request.getEstadoId() != null) {
+            EstadoEpp nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
+
+            log.info("Cambiando estado de '{}' a '{}'",
+                    inventario.getEstado().getNombre(), nuevoEstado.getNombre());
+
+            inventario.setEstado(nuevoEstado);
+        }
+
+        if (request.getCantidadActual() != null) {
+            inventario.setCantidadActual(request.getCantidadActual());
+        }
+        if (request.getCantidadMinima() != null) {
+            inventario.setCantidadMinima(request.getCantidadMinima());
+        }
+        if (request.getCantidadMaxima() != null) {
+            inventario.setCantidadMaxima(request.getCantidadMaxima());
+        }
+        if (request.getUbicacionBodega() != null) {
+            inventario.setUbicacionBodega(request.getUbicacionBodega());
+        }
+        if (request.getCostoUnitario() != null) {
+            inventario.setCostoUnitario(request.getCostoUnitario());
+        }
+        if (request.getProveedor() != null) {
+            inventario.setProveedor(request.getProveedor());
+        }
+        if (request.getFechaVencimiento() != null) {
+            inventario.setFechaVencimiento(request.getFechaVencimiento());
+        }
+        if (request.getObservaciones() != null) {
+            inventario.setObservaciones(request.getObservaciones());
+        }
+
+        inventario = inventarioCentralRepository.save(inventario);
+
+        log.info("Inventario actualizado exitosamente: {}", id);
+
+        return mapToResponseDTO(inventario);
+    }
+
     @Transactional(readOnly = true)
     public InventarioCentralResponseDTO obtenerPorId(Integer id) {
-        log.debug("Buscando inventario central con ID: {}", id);
+        log.debug("Obteniendo inventario central con ID: {}", id);
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
@@ -92,37 +142,30 @@ public class InventarioCentralService {
         return mapToResponseDTO(inventario);
     }
 
-    /**
-     * Listar todo el inventario central.
-     */
     @Transactional(readOnly = true)
     public Page<InventarioCentralResponseDTO> listarTodo(Pageable pageable) {
-        log.debug("Listando inventario central - Página: {}, Tamaño: {}",
-                pageable.getPageNumber(), pageable.getPageSize());
+        log.debug("Listando todo el inventario central - Página: {}", pageable.getPageNumber());
 
         return inventarioCentralRepository.findAll(pageable)
                 .map(this::mapToResponseDTO);
     }
 
-    /**
-     * Listar inventario por EPP.
-     */
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarPorEpp(Integer eppId) {
-        log.debug("Listando inventario del EPP: {}", eppId);
+        log.debug("Listando inventario por EPP ID: {}", eppId);
 
-        return inventarioCentralRepository.findByEppId(eppId)
+        CatalogoEpp epp = catalogoEppRepository.findById(eppId)
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + eppId));
+
+        return inventarioCentralRepository.findByEpp(epp)
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar stock bajo (cantidad actual <= cantidad mínima).
-     */
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarStockBajo() {
-        log.debug("Listando inventario con stock bajo");
+        log.debug("Listando stock bajo");
 
         return inventarioCentralRepository.findStockBajo()
                 .stream()
@@ -130,12 +173,9 @@ public class InventarioCentralService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Listar EPPs próximos a vencer (dentro de 30 días).
-     */
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarProximosAVencer() {
-        log.debug("Listando inventario próximo a vencer");
+        log.debug("Listando EPPs próximos a vencer");
 
         LocalDate fechaLimite = LocalDate.now().plusDays(30);
 
@@ -145,66 +185,9 @@ public class InventarioCentralService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Actualizar información del inventario.
-     */
-    @Transactional
-    public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
-        log.info("Actualizando inventario central con ID: {}", id);
-
-        InventarioCentral inventario = inventarioCentralRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
-
-        // Actualizar solo los campos proporcionados
-        if (request.getCantidadActual() != null) {
-            inventario.setCantidadActual(request.getCantidadActual());
-        }
-
-        if (request.getCantidadMinima() != null) {
-            inventario.setCantidadMinima(request.getCantidadMinima());
-        }
-
-        if (request.getCantidadMaxima() != null) {
-            // Validar que sea mayor a la mínima
-            if (inventario.getCantidadMinima() != null &&
-                    request.getCantidadMaxima() < inventario.getCantidadMinima()) {
-                throw new BusinessException("La cantidad máxima no puede ser menor a la cantidad mínima");
-            }
-            inventario.setCantidadMaxima(request.getCantidadMaxima());
-        }
-
-        if (request.getUbicacionBodega() != null) {
-            inventario.setUbicacionBodega(request.getUbicacionBodega());
-        }
-
-        if (request.getCostoUnitario() != null) {
-            inventario.setCostoUnitario(request.getCostoUnitario());
-        }
-
-        if (request.getProveedor() != null) {
-            inventario.setProveedor(request.getProveedor());
-        }
-
-        if (request.getFechaVencimiento() != null) {
-            inventario.setFechaVencimiento(request.getFechaVencimiento());
-        }
-
-        if (request.getObservaciones() != null) {
-            inventario.setObservaciones(request.getObservaciones());
-        }
-
-        inventario = inventarioCentralRepository.save(inventario);
-
-        log.info("Inventario actualizado exitosamente: {}", id);
-        return mapToResponseDTO(inventario);
-    }
-
-    /**
-     * Ajustar stock del inventario (ingreso o salida manual).
-     */
     @Transactional
     public InventarioCentralResponseDTO ajustarStock(Integer id, AjusteInventarioDTO request) {
-        log.info("Ajustando stock del inventario {} - Ajuste: {} - Motivo: {}",
+        log.info("Ajustando stock del inventario ID: {} - Cantidad: {}, Motivo: {}",
                 id, request.getCantidadAjuste(), request.getMotivo());
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
@@ -212,45 +195,39 @@ public class InventarioCentralService {
 
         int nuevaCantidad = inventario.getCantidadActual() + request.getCantidadAjuste();
 
-        // Validar que no quede en negativo
         if (nuevaCantidad < 0) {
-            throw new BusinessException("El ajuste resultaría en una cantidad negativa. " +
-                    "Stock actual: " + inventario.getCantidadActual() +
-                    ", Ajuste solicitado: " + request.getCantidadAjuste());
+            throw new BusinessException(
+                    String.format("El ajuste resultaría en cantidad negativa. Actual: %d, Ajuste: %d",
+                            inventario.getCantidadActual(), request.getCantidadAjuste()));
         }
 
         inventario.setCantidadActual(nuevaCantidad);
 
-        // Agregar observación sobre el ajuste
-        String nuevaObservacion = String.format("[%s] Ajuste de %+d unidades. Motivo: %s",
-                LocalDate.now(), request.getCantidadAjuste(), request.getMotivo());
+        String tipoAjuste = request.getCantidadAjuste() > 0 ? "INGRESO" : "SALIDA";
+        String observacionAjuste = String.format("%s - %s: %s",
+                tipoAjuste, request.getMotivo(),
+                inventario.getObservaciones() != null ? inventario.getObservaciones() : "");
 
-        if (inventario.getObservaciones() != null && !inventario.getObservaciones().isEmpty()) {
-            inventario.setObservaciones(inventario.getObservaciones() + "\n" + nuevaObservacion);
-        } else {
-            inventario.setObservaciones(nuevaObservacion);
-        }
+        inventario.setObservaciones(observacionAjuste.trim());
 
         inventario = inventarioCentralRepository.save(inventario);
 
-        log.info("Stock ajustado exitosamente. Nueva cantidad: {}", inventario.getCantidadActual());
+        log.info("Stock ajustado exitosamente - Nueva cantidad: {}", nuevaCantidad);
+
         return mapToResponseDTO(inventario);
     }
 
-    /**
-     * Eliminar registro de inventario (solo si cantidad es 0).
-     */
     @Transactional
     public void eliminar(Integer id) {
-        log.info("Eliminando inventario central con ID: {}", id);
+        log.info("Eliminando inventario central ID: {}", id);
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
-        // Validar que no tenga stock
         if (inventario.getCantidadActual() > 0) {
-            throw new BusinessException("No se puede eliminar un inventario con stock disponible. " +
-                    "Cantidad actual: " + inventario.getCantidadActual());
+            throw new BusinessException(
+                    "No se puede eliminar un inventario con stock disponible. " +
+                            "Cantidad actual: " + inventario.getCantidadActual());
         }
 
         inventarioCentralRepository.delete(inventario);
@@ -258,11 +235,7 @@ public class InventarioCentralService {
         log.info("Inventario eliminado exitosamente: {}", id);
     }
 
-    /**
-     * Mapea una entidad InventarioCentral a su DTO de respuesta.
-     */
     private InventarioCentralResponseDTO mapToResponseDTO(InventarioCentral inventario) {
-        // Calcular días para vencer
         Integer diasParaVencer = null;
         if (inventario.getFechaVencimiento() != null) {
             diasParaVencer = (int) ChronoUnit.DAYS.between(LocalDate.now(), inventario.getFechaVencimiento());
@@ -273,6 +246,11 @@ public class InventarioCentralService {
                 .eppId(inventario.getEpp().getEppId())
                 .eppNombre(inventario.getEpp().getNombreEpp())
                 .eppCodigoIdentificacion(inventario.getEpp().getCodigoIdentificacion())
+                .estadoId(inventario.getEstado().getEstadoId())
+                .estadoNombre(inventario.getEstado().getNombre())
+                .estadoDescripcion(inventario.getEstado().getDescripcion())
+                .estadoPermiteUso(inventario.getEstado().getPermiteUso())
+                .estadoColorHex(inventario.getEstado().getColorHex())
                 .cantidadActual(inventario.getCantidadActual())
                 .cantidadMinima(inventario.getCantidadMinima())
                 .cantidadMaxima(inventario.getCantidadMaxima())

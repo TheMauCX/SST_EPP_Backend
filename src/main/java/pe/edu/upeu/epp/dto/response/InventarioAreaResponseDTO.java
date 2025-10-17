@@ -19,13 +19,19 @@ public class InventarioAreaResponseDTO {
     private String eppCodigoIdentificacion;
     private Integer areaId;
     private String areaNombre;
+
+    private Integer estadoId;
+    private String estadoNombre;
+    private String estadoDescripcion;
+    private Boolean estadoPermiteUso;
+    private String estadoColorHex;
+
     private Integer cantidadActual;
     private Integer cantidadMinima;
     private Integer cantidadMaxima;
     private String ubicacion;
     private LocalDateTime ultimaActualizacion;
 
-    // Campos calculados
     private Boolean necesitaReposicion;
-    private Integer porcentajeStock; // (cantidadActual / cantidadMaxima) * 100
+    private Integer porcentajeStock;
 }

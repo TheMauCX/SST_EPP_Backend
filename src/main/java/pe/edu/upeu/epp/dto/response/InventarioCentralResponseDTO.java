@@ -19,6 +19,13 @@ public class InventarioCentralResponseDTO {
     private Integer eppId;
     private String eppNombre;
     private String eppCodigoIdentificacion;
+
+    private Integer estadoId;
+    private String estadoNombre;
+    private String estadoDescripcion;
+    private Boolean estadoPermiteUso;
+    private String estadoColorHex;
+
     private Integer cantidadActual;
     private Integer cantidadMinima;
     private Integer cantidadMaxima;
@@ -31,7 +38,6 @@ public class InventarioCentralResponseDTO {
     private String observaciones;
     private LocalDateTime ultimaActualizacion;
 
-    // Campos calculados
     private Boolean necesitaReposicion;
     private Integer diasParaVencer;
 }

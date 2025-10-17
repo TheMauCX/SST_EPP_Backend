@@ -14,19 +14,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TransferenciaStockDTO {
 
-    @NotNull(message = "El ID del inventario central es obligatorio")
-    private Integer inventarioCentralId;
+    @NotNull(message = "El ID del EPP es obligatorio")
+    private Integer eppId;
 
     @NotNull(message = "El ID del área destino es obligatorio")
-    private Integer areaDestinoId;
+    private Integer areaId;
 
     @NotNull(message = "La cantidad a transferir es obligatoria")
     @Min(value = 1, message = "La cantidad debe ser al menos 1")
     private Integer cantidad;
 
-    @NotNull(message = "El ID del supervisor responsable es obligatorio")
-    private Integer supervisorId;
-
-    @Size(max = 500, message = "Las observaciones no pueden exceder 500 caracteres")
-    private String observaciones;
+    @Size(max = 500, message = "El motivo no puede exceder 500 caracteres")
+    private String motivo;
 }
