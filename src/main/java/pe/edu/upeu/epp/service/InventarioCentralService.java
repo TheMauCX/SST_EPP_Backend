@@ -20,10 +20,16 @@ import pe.edu.upeu.epp.repository.EstadoEppRepository;
 import pe.edu.upeu.epp.repository.InventarioCentralRepository;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio para gestión de Inventario Central con lógica de merge.
+ *
+ * @author Sistema EPP
+ * @version 2.0 - Corregido para usar inventarioCentralId
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,9 +39,12 @@ public class InventarioCentralService {
     private final CatalogoEppRepository catalogoEppRepository;
     private final EstadoEppRepository estadoEppRepository;
 
+    /**
+     * Crea un nuevo registro de inventario central.
+     */
     @Transactional
     public InventarioCentralResponseDTO crear(InventarioCentralRequestDTO request) {
-        log.info("Registrando nuevo stock en inventario central - EPP ID: {}, Lote: {}, Estado ID: {}",
+        log.info("Creando inventario central - EPP ID: {}, Lote: {}, Estado ID: {}",
                 request.getEppId(), request.getLote(), request.getEstadoId());
 
         CatalogoEpp epp = catalogoEppRepository.findById(request.getEppId())
@@ -44,21 +53,13 @@ public class InventarioCentralService {
         EstadoEpp estado = estadoEppRepository.findById(request.getEstadoId())
                 .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
 
-        log.debug("Estado seleccionado: {} - Permite uso: {}", estado.getNombre(), estado.getPermiteUso());
-
-        if (!Boolean.TRUE.equals(estado.getPermiteUso())) {
-            log.warn("Se está registrando stock con estado que no permite uso: {}", estado.getNombre());
+        boolean existe = inventarioCentralRepository.existsByEppAndLoteAndEstado(epp, request.getLote(), estado);
+        if (existe) {
+            throw new BusinessException(
+                    String.format("Ya existe un registro de inventario para EPP '%s', Lote '%s', Estado '%s'",
+                            epp.getNombreEpp(), request.getLote(), estado.getNombre())
+            );
         }
-
-        inventarioCentralRepository.findByEppAndLote(epp, request.getLote())
-                .stream()
-                .filter(inv -> inv.getEstado().getEstadoId().equals(request.getEstadoId()))
-                .findFirst()
-                .ifPresent(inv -> {
-                    throw new BusinessException(
-                            String.format("Ya existe un registro de inventario para EPP '%s', lote '%s' y estado '%s'",
-                                    epp.getNombreEpp(), request.getLote(), estado.getNombre()));
-                });
 
         InventarioCentral inventario = InventarioCentral.builder()
                 .epp(epp)
@@ -75,66 +76,111 @@ public class InventarioCentralService {
                 .observaciones(request.getObservaciones())
                 .build();
 
-        inventario = inventarioCentralRepository.save(inventario);
+        InventarioCentral guardado = inventarioCentralRepository.save(inventario);
+        log.info("Inventario central creado con ID: {}", guardado.getInventarioCentralId());
 
-        log.info("Stock registrado exitosamente - ID: {}, Estado: {}",
-                inventario.getInventarioCentralId(), estado.getNombre());
-
-        return mapToResponseDTO(inventario);
+        return mapToResponseDTO(guardado);
     }
 
+    /**
+     * Actualiza un inventario existente con lógica de MERGE.
+     */
     @Transactional
     public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
         log.info("Actualizando inventario central ID: {}", id);
 
-        InventarioCentral inventario = inventarioCentralRepository.findById(id)
+        InventarioCentral inventarioActual = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
+        CatalogoEpp nuevoEpp = inventarioActual.getEpp();
+        String nuevoLote = request.getLote() != null ? request.getLote() : inventarioActual.getLote();
+
+        EstadoEpp nuevoEstado = inventarioActual.getEstado();
         if (request.getEstadoId() != null) {
-            EstadoEpp nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
+            nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
                     .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
-
-            log.info("Cambiando estado de '{}' a '{}'",
-                    inventario.getEstado().getNombre(), nuevoEstado.getNombre());
-
-            inventario.setEstado(nuevoEstado);
         }
 
-        if (request.getCantidadActual() != null) {
-            inventario.setCantidadActual(request.getCantidadActual());
+        boolean cambioLote = !nuevoLote.equals(inventarioActual.getLote());
+        boolean cambioEstado = !nuevoEstado.getEstadoId().equals(inventarioActual.getEstado().getEstadoId());
+        boolean hayCambiosClave = cambioLote || cambioEstado;
+
+        log.debug("Cambios detectados - Lote: {}, Estado: {}", cambioLote, cambioEstado);
+
+        if (hayCambiosClave) {
+            log.info("Detectados cambios en campos clave. Buscando registro existente...");
+
+            Optional<InventarioCentral> registroExistente =
+                    inventarioCentralRepository.findByEppAndLoteAndEstado(nuevoEpp, nuevoLote, nuevoEstado);
+
+            if (registroExistente.isPresent() && !registroExistente.get().getInventarioCentralId().equals(id)) {
+                log.warn("Ya existe un registro con la nueva combinación. Ejecutando MERGE...");
+
+                InventarioCentral destino = registroExistente.get();
+                Integer cantidadAMover = inventarioActual.getCantidadActual();
+
+                log.info("MERGE: Moviendo {} unidades del registro ID {} al registro ID {}",
+                        cantidadAMover, id, destino.getInventarioCentralId());
+
+                destino.setCantidadActual(destino.getCantidadActual() + cantidadAMover);
+
+                if (request.getCantidadMinima() != null) {
+                    destino.setCantidadMinima(request.getCantidadMinima());
+                }
+                if (request.getCantidadMaxima() != null) {
+                    destino.setCantidadMaxima(request.getCantidadMaxima());
+                }
+                if (request.getUbicacionBodega() != null) {
+                    destino.setUbicacionBodega(request.getUbicacionBodega());
+                }
+                if (request.getObservaciones() != null) {
+                    String observacionMerge = String.format(
+                            "[MERGE] %s unidades consolidadas desde registro ID %d. %s",
+                            cantidadAMover, id, request.getObservaciones()
+                    );
+                    destino.setObservaciones(observacionMerge);
+                }
+
+                InventarioCentral consolidado = inventarioCentralRepository.save(destino);
+                inventarioCentralRepository.delete(inventarioActual);
+
+                log.info("MERGE completado. Registro {} eliminado. Nuevo total en {}: {}",
+                        id, consolidado.getInventarioCentralId(), consolidado.getCantidadActual());
+
+                return mapToResponseDTO(consolidado);
+            }
+        }
+
+        log.info("No hay conflictos. Actualizando normalmente...");
+
+        if (request.getEstadoId() != null) {
+            inventarioActual.setEstado(nuevoEstado);
+        }
+        if (request.getLote() != null) {
+            inventarioActual.setLote(nuevoLote);
         }
         if (request.getCantidadMinima() != null) {
-            inventario.setCantidadMinima(request.getCantidadMinima());
+            inventarioActual.setCantidadMinima(request.getCantidadMinima());
         }
         if (request.getCantidadMaxima() != null) {
-            inventario.setCantidadMaxima(request.getCantidadMaxima());
+            inventarioActual.setCantidadMaxima(request.getCantidadMaxima());
         }
         if (request.getUbicacionBodega() != null) {
-            inventario.setUbicacionBodega(request.getUbicacionBodega());
-        }
-        if (request.getCostoUnitario() != null) {
-            inventario.setCostoUnitario(request.getCostoUnitario());
-        }
-        if (request.getProveedor() != null) {
-            inventario.setProveedor(request.getProveedor());
-        }
-        if (request.getFechaVencimiento() != null) {
-            inventario.setFechaVencimiento(request.getFechaVencimiento());
+            inventarioActual.setUbicacionBodega(request.getUbicacionBodega());
         }
         if (request.getObservaciones() != null) {
-            inventario.setObservaciones(request.getObservaciones());
+            inventarioActual.setObservaciones(request.getObservaciones());
         }
 
-        inventario = inventarioCentralRepository.save(inventario);
+        InventarioCentral actualizado = inventarioCentralRepository.save(inventarioActual);
+        log.info("Inventario actualizado. ID: {}", actualizado.getInventarioCentralId());
 
-        log.info("Inventario actualizado exitosamente: {}", id);
-
-        return mapToResponseDTO(inventario);
+        return mapToResponseDTO(actualizado);
     }
 
     @Transactional(readOnly = true)
     public InventarioCentralResponseDTO obtenerPorId(Integer id) {
-        log.debug("Obteniendo inventario central con ID: {}", id);
+        log.info("Obteniendo inventario central ID: {}", id);
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
@@ -143,109 +189,92 @@ public class InventarioCentralService {
     }
 
     @Transactional(readOnly = true)
-    public Page<InventarioCentralResponseDTO> listarTodo(Pageable pageable) {
-        log.debug("Listando todo el inventario central - Página: {}", pageable.getPageNumber());
-
-        return inventarioCentralRepository.findAll(pageable)
-                .map(this::mapToResponseDTO);
+    public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable) {
+        log.info("Listando inventarios centrales");
+        return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarPorEpp(Integer eppId) {
-        log.debug("Listando inventario por EPP ID: {}", eppId);
+        log.info("Listando inventarios del EPP ID: {}", eppId);
 
         CatalogoEpp epp = catalogoEppRepository.findById(eppId)
                 .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + eppId));
 
-        return inventarioCentralRepository.findByEpp(epp)
-                .stream()
+        return inventarioCentralRepository.findByEpp(epp).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarStockBajo() {
-        log.debug("Listando stock bajo");
-
-        return inventarioCentralRepository.findStockBajo()
-                .stream()
+        log.info("Obteniendo alertas de stock bajo");
+        return inventarioCentralRepository.findStockBajo().stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarProximosAVencer() {
-        log.debug("Listando EPPs próximos a vencer");
-
+        log.info("Obteniendo alertas de próximos a vencer");
         LocalDate fechaLimite = LocalDate.now().plusDays(30);
-
-        return inventarioCentralRepository.findProximosAVencer(fechaLimite)
-                .stream()
+        return inventarioCentralRepository.findByFechaVencimientoBefore(fechaLimite).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public InventarioCentralResponseDTO ajustarStock(Integer id, AjusteInventarioDTO request) {
-        log.info("Ajustando stock del inventario ID: {} - Cantidad: {}, Motivo: {}",
-                id, request.getCantidadAjuste(), request.getMotivo());
+        log.info("Ajustando stock ID: {}", id);
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
-        int nuevaCantidad = inventario.getCantidadActual() + request.getCantidadAjuste();
+        Integer cantidadAnterior = inventario.getCantidadActual();
+        Integer ajuste = request.getCantidadAjuste();
+
+        if ("SALIDA".equals(request.getTipoAjuste())) {
+            ajuste = -ajuste;
+        }
+
+        Integer nuevaCantidad = cantidadAnterior + ajuste;
 
         if (nuevaCantidad < 0) {
-            throw new BusinessException(
-                    String.format("El ajuste resultaría en cantidad negativa. Actual: %d, Ajuste: %d",
-                            inventario.getCantidadActual(), request.getCantidadAjuste()));
+            throw new BusinessException("El ajuste resultaría en cantidad negativa");
         }
 
         inventario.setCantidadActual(nuevaCantidad);
 
-        String tipoAjuste = request.getCantidadAjuste() > 0 ? "INGRESO" : "SALIDA";
-        String observacionAjuste = String.format("%s - %s: %s",
-                tipoAjuste, request.getMotivo(),
-                inventario.getObservaciones() != null ? inventario.getObservaciones() : "");
+        String observacionAjuste = String.format(
+                "[AJUSTE %s] %d unidades. Motivo: %s",
+                request.getTipoAjuste(), Math.abs(ajuste), request.getMotivo()
+        );
+        inventario.setObservaciones(observacionAjuste);
 
-        inventario.setObservaciones(observacionAjuste.trim());
-
-        inventario = inventarioCentralRepository.save(inventario);
-
-        log.info("Stock ajustado exitosamente - Nueva cantidad: {}", nuevaCantidad);
-
-        return mapToResponseDTO(inventario);
+        return mapToResponseDTO(inventarioCentralRepository.save(inventario));
     }
 
     @Transactional
     public void eliminar(Integer id) {
-        log.info("Eliminando inventario central ID: {}", id);
+        log.info("Eliminando inventario ID: {}", id);
 
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
         if (inventario.getCantidadActual() > 0) {
-            throw new BusinessException(
-                    "No se puede eliminar un inventario con stock disponible. " +
-                            "Cantidad actual: " + inventario.getCantidadActual());
+            throw new BusinessException("No se puede eliminar inventario con stock disponible");
         }
 
         inventarioCentralRepository.delete(inventario);
-
-        log.info("Inventario eliminado exitosamente: {}", id);
     }
 
     private InventarioCentralResponseDTO mapToResponseDTO(InventarioCentral inventario) {
-        Integer diasParaVencer = null;
-        if (inventario.getFechaVencimiento() != null) {
-            diasParaVencer = (int) ChronoUnit.DAYS.between(LocalDate.now(), inventario.getFechaVencimiento());
-        }
-
         return InventarioCentralResponseDTO.builder()
-                .inventarioCentralId(inventario.getInventarioCentralId())
+                .inventarioId(inventario.getInventarioCentralId())
                 .eppId(inventario.getEpp().getEppId())
                 .eppNombre(inventario.getEpp().getNombreEpp())
                 .eppCodigoIdentificacion(inventario.getEpp().getCodigoIdentificacion())
+                .tipoUso(inventario.getEpp().getTipoUso())
                 .estadoId(inventario.getEstado().getEstadoId())
                 .estadoNombre(inventario.getEstado().getNombre())
                 .estadoDescripcion(inventario.getEstado().getDescripcion())
@@ -263,7 +292,8 @@ public class InventarioCentralService {
                 .observaciones(inventario.getObservaciones())
                 .ultimaActualizacion(inventario.getUltimaActualizacion())
                 .necesitaReposicion(inventario.necesitaReposicion())
-                .diasParaVencer(diasParaVencer)
+                .diasParaVencer(inventario.getFechaVencimiento() != null ?
+                        (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), inventario.getFechaVencimiento()) : null)
                 .build();
     }
 }

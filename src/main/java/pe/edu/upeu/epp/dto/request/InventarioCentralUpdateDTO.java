@@ -1,9 +1,6 @@
 package pe.edu.upeu.epp.dto.request;
 
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,4 +40,8 @@ public class InventarioCentralUpdateDTO {
 
     @Size(max = 500, message = "Las observaciones no pueden exceder 500 caracteres")
     private String observaciones;
+
+    @NotBlank(message = "El lote es obligatorio")
+    @Size(max = 50, message = "El lote no puede exceder 50 caracteres")
+    private String lote;
 }

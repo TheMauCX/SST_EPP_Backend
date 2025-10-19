@@ -70,7 +70,7 @@ public class InventarioCentralController {
     public ResponseEntity<Page<InventarioCentralResponseDTO>> listarTodo(
             @PageableDefault(size = 20, sort = "ultimaActualizacion", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        Page<InventarioCentralResponseDTO> response = inventarioCentralService.listarTodo(pageable);
+        Page<InventarioCentralResponseDTO> response = inventarioCentralService.listarTodos(pageable);
         return ResponseEntity.ok(response);
     }
 

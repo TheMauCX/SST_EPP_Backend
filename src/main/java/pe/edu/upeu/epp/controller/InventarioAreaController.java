@@ -87,7 +87,7 @@ public class InventarioAreaController {
     @Operation(summary = "Alertas globales de stock crítico",
             description = "Retorna todo el stock crítico de todas las áreas")
     public ResponseEntity<List<InventarioAreaResponseDTO>> listarStockCritico() {
-        List<InventarioAreaResponseDTO> response = inventarioAreaService.listarStockCritico();
+        List<InventarioAreaResponseDTO> response = inventarioAreaService.listarStockBajoGlobal();
         return ResponseEntity.ok(response);
     }
 

@@ -3,19 +3,36 @@ package pe.edu.upeu.epp.service;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.epp.dto.request.InventarioAreaRequestDTO;
 import pe.edu.upeu.epp.dto.request.InventarioAreaUpdateDTO;
 import pe.edu.upeu.epp.dto.request.TransferenciaStockDTO;
 import pe.edu.upeu.epp.dto.response.InventarioAreaResponseDTO;
-import pe.edu.upeu.epp.entity.*;
+import pe.edu.upeu.epp.entity.Area;
+import pe.edu.upeu.epp.entity.CatalogoEpp;
+import pe.edu.upeu.epp.entity.EstadoEpp;
+import pe.edu.upeu.epp.entity.InventarioArea;
+import pe.edu.upeu.epp.entity.InventarioCentral;
 import pe.edu.upeu.epp.exception.BusinessException;
-import pe.edu.upeu.epp.repository.*;
+import pe.edu.upeu.epp.repository.AreaRepository;
+import pe.edu.upeu.epp.repository.CatalogoEppRepository;
+import pe.edu.upeu.epp.repository.EstadoEppRepository;
+import pe.edu.upeu.epp.repository.InventarioAreaRepository;
+import pe.edu.upeu.epp.repository.InventarioCentralRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio para gestión de Inventario por Área con lógica de merge.
+ *
+ * @author Sistema EPP
+ * @version 2.0 - Corregido para usar inventarioAreaId
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,6 +44,9 @@ public class InventarioAreaService {
     private final AreaRepository areaRepository;
     private final EstadoEppRepository estadoEppRepository;
 
+    /**
+     * Crea un nuevo inventario de área.
+     */
     @Transactional
     public InventarioAreaResponseDTO crear(InventarioAreaRequestDTO request) {
         log.info("Creando inventario de área - EPP ID: {}, Área ID: {}, Estado ID: {}",
@@ -41,14 +61,12 @@ public class InventarioAreaService {
         EstadoEpp estado = estadoEppRepository.findById(request.getEstadoId())
                 .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
 
-        log.debug("Estado seleccionado: {} - Permite uso: {}", estado.getNombre(), estado.getPermiteUso());
-
-        if (inventarioAreaRepository.findByEppIdAndAreaId(epp.getEppId(), area.getAreaId())
-                .stream()
-                .anyMatch(inv -> inv.getEstado().getEstadoId().equals(request.getEstadoId()))) {
+        boolean existe = inventarioAreaRepository.existsByEppAndAreaAndEstado(epp, area, estado);
+        if (existe) {
             throw new BusinessException(
-                    String.format("Ya existe un registro de inventario para EPP '%s' en área '%s' con estado '%s'",
-                            epp.getNombreEpp(), area.getNombreArea(), estado.getNombre()));
+                    String.format("Ya existe inventario para EPP '%s' en área '%s' con estado '%s'",
+                            epp.getNombreEpp(), area.getNombreArea(), estado.getNombre())
+            );
         }
 
         InventarioArea inventario = InventarioArea.builder()
@@ -61,154 +79,209 @@ public class InventarioAreaService {
                 .ubicacion(request.getUbicacion())
                 .build();
 
-        inventario = inventarioAreaRepository.save(inventario);
+        InventarioArea guardado = inventarioAreaRepository.save(inventario);
+        log.info("Inventario de área creado con ID: {}", guardado.getInventarioAreaId());
 
-        log.info("Inventario de área creado exitosamente - ID: {}, Estado: {}",
-                inventario.getInventarioAreaId(), estado.getNombre());
-
-        return mapToResponseDTO(inventario);
+        return mapToResponseDTO(guardado);
     }
 
+    /**
+     * Actualiza un inventario de área con lógica de MERGE.
+     */
     @Transactional
     public InventarioAreaResponseDTO actualizar(Integer id, InventarioAreaUpdateDTO request) {
         log.info("Actualizando inventario de área ID: {}", id);
 
-        InventarioArea inventario = inventarioAreaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario de área no encontrado con ID: " + id));
+        InventarioArea inventarioActual = inventarioAreaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
+
+        CatalogoEpp nuevoEpp = inventarioActual.getEpp();
+        Area nuevaArea = inventarioActual.getArea();
+
+        EstadoEpp nuevoEstado = inventarioActual.getEstado();
+        if (request.getEstadoId() != null) {
+            nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
+        }
+
+        boolean cambioEstado = !nuevoEstado.getEstadoId().equals(inventarioActual.getEstado().getEstadoId());
+
+        log.debug("Cambio de estado detectado: {}", cambioEstado);
+
+        if (cambioEstado) {
+            log.info("Detectado cambio de estado. Buscando registro existente...");
+
+            Optional<InventarioArea> registroExistente =
+                    inventarioAreaRepository.findByEppAndAreaAndEstado(nuevoEpp, nuevaArea, nuevoEstado);
+
+            if (registroExistente.isPresent() && !registroExistente.get().getInventarioAreaId().equals(id)) {
+                log.warn("Ya existe un registro con la nueva combinación. Ejecutando MERGE...");
+
+                InventarioArea destino = registroExistente.get();
+                Integer cantidadAMover = inventarioActual.getCantidadActual();
+
+                log.info("MERGE: Moviendo {} unidades del registro ID {} al registro ID {}",
+                        cantidadAMover, id, destino.getInventarioAreaId());
+
+                destino.setCantidadActual(destino.getCantidadActual() + cantidadAMover);
+
+                if (request.getCantidadMinima() != null) {
+                    destino.setCantidadMinima(request.getCantidadMinima());
+                }
+                if (request.getCantidadMaxima() != null) {
+                    destino.setCantidadMaxima(request.getCantidadMaxima());
+                }
+                if (request.getUbicacion() != null) {
+                    destino.setUbicacion(request.getUbicacion());
+                }
+
+                InventarioArea consolidado = inventarioAreaRepository.save(destino);
+                inventarioAreaRepository.delete(inventarioActual);
+
+                log.info("MERGE completado. Registro {} eliminado. Nuevo total en {}: {}",
+                        id, consolidado.getInventarioAreaId(), consolidado.getCantidadActual());
+
+                return mapToResponseDTO(consolidado);
+            }
+        }
+
+        log.info("No hay conflictos. Actualizando normalmente...");
 
         if (request.getEstadoId() != null) {
-            EstadoEpp nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
-
-            log.info("Cambiando estado de '{}' a '{}' en área '{}'",
-                    inventario.getEstado().getNombre(), nuevoEstado.getNombre(),
-                    inventario.getArea().getNombreArea());
-
-            inventario.setEstado(nuevoEstado);
-        }
-
-        if (request.getCantidadActual() != null) {
-            inventario.setCantidadActual(request.getCantidadActual());
+            inventarioActual.setEstado(nuevoEstado);
         }
         if (request.getCantidadMinima() != null) {
-            inventario.setCantidadMinima(request.getCantidadMinima());
+            inventarioActual.setCantidadMinima(request.getCantidadMinima());
         }
         if (request.getCantidadMaxima() != null) {
-            inventario.setCantidadMaxima(request.getCantidadMaxima());
+            inventarioActual.setCantidadMaxima(request.getCantidadMaxima());
         }
         if (request.getUbicacion() != null) {
-            inventario.setUbicacion(request.getUbicacion());
+            inventarioActual.setUbicacion(request.getUbicacion());
         }
 
-        inventario = inventarioAreaRepository.save(inventario);
+        InventarioArea actualizado = inventarioAreaRepository.save(inventarioActual);
+        log.info("Inventario de área actualizado. ID: {}", actualizado.getInventarioAreaId());
 
-        log.info("Inventario de área actualizado exitosamente: {}", id);
-
-        return mapToResponseDTO(inventario);
+        return mapToResponseDTO(actualizado);
     }
 
     @Transactional(readOnly = true)
     public InventarioAreaResponseDTO obtenerPorId(Integer id) {
-        log.debug("Obteniendo inventario de área con ID: {}", id);
+        log.info("Obteniendo inventario de área ID: {}", id);
 
         InventarioArea inventario = inventarioAreaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario de área no encontrado con ID: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
         return mapToResponseDTO(inventario);
     }
 
     @Transactional(readOnly = true)
+    public Page<InventarioAreaResponseDTO> listarTodos(Pageable pageable) {
+        log.info("Listando inventarios de área");
+        return inventarioAreaRepository.findAll(pageable).map(this::mapToResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
     public List<InventarioAreaResponseDTO> listarPorArea(Integer areaId) {
-        log.debug("Listando inventario del área ID: {}", areaId);
+        log.info("Listando inventarios del área ID: {}", areaId);
 
         Area area = areaRepository.findById(areaId)
                 .orElseThrow(() -> new EntityNotFoundException("Área no encontrada con ID: " + areaId));
 
-        return inventarioAreaRepository.findByArea(area)
-                .stream()
+        return inventarioAreaRepository.findByArea(area).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<InventarioAreaResponseDTO> listarStockBajoPorArea(Integer areaId) {
-        log.debug("Listando stock bajo del área ID: {}", areaId);
+        log.info("Obteniendo alertas de stock bajo para área ID: {}", areaId);
 
-        return inventarioAreaRepository.findStockBajoPorArea(areaId)
-                .stream()
+        Area area = areaRepository.findById(areaId)
+                .orElseThrow(() -> new EntityNotFoundException("Área no encontrada con ID: " + areaId));
+
+        return inventarioAreaRepository.findStockBajoByArea(area).stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<InventarioAreaResponseDTO> listarStockCritico() {
-        log.debug("Listando todo el stock crítico");
-
-        return inventarioAreaRepository.findAllStockCritico()
-                .stream()
+    public List<InventarioAreaResponseDTO> listarStockBajoGlobal() {
+        log.info("Obteniendo alertas de stock bajo globales");
+        return inventarioAreaRepository.findStockBajo().stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    /**
+     * Transferir stock de Central a Área.
+     */
+    @Transactional
     public InventarioAreaResponseDTO transferirStockCentralAArea(TransferenciaStockDTO request) {
-        log.info("==== INICIANDO TRANSFERENCIA DE STOCK ====");
-        log.info("EPP ID: {}, Área Destino ID: {}, Cantidad: {}",
+        log.info("Iniciando transferencia - EPP ID: {}, Área ID: {}, Cantidad: {}",
                 request.getEppId(), request.getAreaId(), request.getCantidad());
 
         CatalogoEpp epp = catalogoEppRepository.findById(request.getEppId())
                 .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + request.getEppId()));
 
-        Area areaDestino = areaRepository.findById(request.getAreaId())
+        Area area = areaRepository.findById(request.getAreaId())
                 .orElseThrow(() -> new EntityNotFoundException("Área no encontrada con ID: " + request.getAreaId()));
 
-        List<InventarioCentral> inventariosCentral = inventarioCentralRepository.findByEpp(epp)
-                .stream()
-                .filter(inv -> inv.getEstado().getPermiteUso() && inv.getCantidadActual() >= request.getCantidad())
-                .toList();
+        List<InventarioCentral> inventariosCentrales =
+                inventarioCentralRepository.findByEppAndEstadoPermiteUsoOrderByCantidadDesc(epp, true);
 
-        if (inventariosCentral.isEmpty()) {
+        InventarioCentral invCentral = inventariosCentrales.stream()
+                .filter(inv -> inv.getCantidadDisponible() >= request.getCantidad())
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        String.format("No hay stock suficiente en inventario central. EPP: '%s', Solicitado: %d",
+                                epp.getNombreEpp(), request.getCantidad())
+                ));
+
+        log.info("Inventario central encontrado - ID: {}, Estado: {}, Disponible: {}",
+                invCentral.getInventarioCentralId(),
+                invCentral.getEstado().getNombre(),
+                invCentral.getCantidadDisponible());
+
+        if (invCentral.getCantidadDisponible() < request.getCantidad()) {
             throw new BusinessException(
-                    String.format("No hay stock suficiente disponible en inventario central para EPP '%s'. Solicitado: %d",
-                            epp.getNombreEpp(), request.getCantidad()));
+                    String.format("Stock insuficiente. Disponible: %d, Solicitado: %d",
+                            invCentral.getCantidadDisponible(), request.getCantidad())
+            );
         }
 
-        InventarioCentral inventarioCentral = inventariosCentral.get(0);
-        EstadoEpp estado = inventarioCentral.getEstado();
+        invCentral.setCantidadActual(invCentral.getCantidadActual() - request.getCantidad());
+        inventarioCentralRepository.save(invCentral);
 
-        log.info("Usando inventario central ID: {}, Estado: {}, Stock disponible: {}",
-                inventarioCentral.getInventarioCentralId(), estado.getNombre(),
-                inventarioCentral.getCantidadActual());
+        log.info("Stock reducido en central. Nueva cantidad: {}", invCentral.getCantidadActual());
 
-        inventarioCentral.setCantidadActual(inventarioCentral.getCantidadActual() - request.getCantidad());
-        inventarioCentralRepository.save(inventarioCentral);
+        EstadoEpp estado = invCentral.getEstado();
+        Optional<InventarioArea> invAreaOpt =
+                inventarioAreaRepository.findByEppAndAreaAndEstado(epp, area, estado);
 
-        log.info("Stock restado de inventario central - Nueva cantidad: {}", inventarioCentral.getCantidadActual());
+        InventarioArea invArea;
+        if (invAreaOpt.isPresent()) {
+            invArea = invAreaOpt.get();
+            invArea.setCantidadActual(invArea.getCantidadActual() + request.getCantidad());
+            log.info("Inventario de área actualizado. Nueva cantidad: {}", invArea.getCantidadActual());
+        } else {
+            invArea = InventarioArea.builder()
+                    .epp(epp)
+                    .area(area)
+                    .estado(estado)
+                    .cantidadActual(request.getCantidad())
+                    .cantidadMinima(5)
+                    .cantidadMaxima(request.getCantidad() * 2)
+                    .ubicacion("Transferido desde central")
+                    .build();
+            log.info("Nuevo inventario de área creado con {} unidades", request.getCantidad());
+        }
 
-        InventarioArea inventarioArea = inventarioAreaRepository
-                .findByEppIdAndAreaId(epp.getEppId(), areaDestino.getAreaId())
-                .stream()
-                .filter(inv -> inv.getEstado().getEstadoId().equals(estado.getEstadoId()))
-                .findFirst()
-                .orElseGet(() -> {
-                    log.info("No existe inventario de área con estado '{}', creando nuevo registro", estado.getNombre());
-                    return InventarioArea.builder()
-                            .epp(epp)
-                            .area(areaDestino)
-                            .estado(estado)
-                            .cantidadActual(0)
-                            .cantidadMinima(5)
-                            .cantidadMaxima(50)
-                            .build();
-                });
+        InventarioArea guardado = inventarioAreaRepository.save(invArea);
+        log.info("Transferencia completada. Inventario área ID: {}", guardado.getInventarioAreaId());
 
-        inventarioArea.setCantidadActual(inventarioArea.getCantidadActual() + request.getCantidad());
-        inventarioArea = inventarioAreaRepository.save(inventarioArea);
-
-        log.info("Stock sumado a inventario de área - Nueva cantidad: {}", inventarioArea.getCantidadActual());
-        log.info("==== TRANSFERENCIA COMPLETADA EXITOSAMENTE ====");
-
-        return mapToResponseDTO(inventarioArea);
+        return mapToResponseDTO(guardado);
     }
 
     @Transactional
@@ -216,27 +289,22 @@ public class InventarioAreaService {
         log.info("Eliminando inventario de área ID: {}", id);
 
         InventarioArea inventario = inventarioAreaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario de área no encontrado con ID: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
         if (inventario.getCantidadActual() > 0) {
-            throw new BusinessException(
-                    "No se puede eliminar un inventario con stock disponible. " +
-                            "Cantidad actual: " + inventario.getCantidadActual());
+            throw new BusinessException("No se puede eliminar inventario con stock disponible");
         }
 
         inventarioAreaRepository.delete(inventario);
-
-        log.info("Inventario de área eliminado exitosamente: {}", id);
     }
 
     private InventarioAreaResponseDTO mapToResponseDTO(InventarioArea inventario) {
-        Integer porcentajeStock = inventario.calcularPorcentajeStock();
-
         return InventarioAreaResponseDTO.builder()
                 .inventarioAreaId(inventario.getInventarioAreaId())
                 .eppId(inventario.getEpp().getEppId())
                 .eppNombre(inventario.getEpp().getNombreEpp())
                 .eppCodigoIdentificacion(inventario.getEpp().getCodigoIdentificacion())
+                .tipoUso(inventario.getEpp().getTipoUso())
                 .areaId(inventario.getArea().getAreaId())
                 .areaNombre(inventario.getArea().getNombreArea())
                 .estadoId(inventario.getEstado().getEstadoId())
@@ -250,7 +318,7 @@ public class InventarioAreaService {
                 .ubicacion(inventario.getUbicacion())
                 .ultimaActualizacion(inventario.getUltimaActualizacion())
                 .necesitaReposicion(inventario.necesitaReposicion())
-                .porcentajeStock(porcentajeStock)
+                .porcentajeStock(inventario.calcularPorcentajeStock())
                 .build();
     }
 }

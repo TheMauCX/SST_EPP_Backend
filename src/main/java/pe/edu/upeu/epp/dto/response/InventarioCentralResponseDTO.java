@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import pe.edu.upeu.epp.entity.CatalogoEpp;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -15,10 +16,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class InventarioCentralResponseDTO {
 
-    private Integer inventarioCentralId;
+    private Integer inventarioId;
     private Integer eppId;
     private String eppNombre;
     private String eppCodigoIdentificacion;
+    private CatalogoEpp.TipoUso tipoUso;
 
     private Integer estadoId;
     private String estadoNombre;

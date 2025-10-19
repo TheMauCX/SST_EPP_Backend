@@ -34,10 +34,6 @@ public class CatalogoEpp {
     @Column(name = "especificaciones_tecnicas", columnDefinition = "TEXT")
     private String especificacionesTecnicas;
 
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_uso", nullable = false, length = 20)
-    private TipoUso tipoUso;
 
     @Column(name = "vida_util_meses")
     private Integer vidaUtilMeses;
@@ -62,6 +58,11 @@ public class CatalogoEpp {
 
     @Column(name = "unidad_medida", length = 20)
     private String unidadMedida;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_uso", nullable = false, length = 20)
+    private CatalogoEpp.TipoUso tipoUso;
 
     @PrePersist
     protected void onCreate() {

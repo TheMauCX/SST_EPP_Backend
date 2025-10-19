@@ -3,6 +3,8 @@ package pe.edu.upeu.epp.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -74,6 +76,15 @@ public class InventarioCentral {
     @Column(name = "ultima_actualizacion", nullable = false)
     private LocalDateTime ultimaActualizacion;
 
+    @CreatedDate
+    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    private LocalDateTime fechaCreacion;
+
+    @LastModifiedDate
+    @Column(name = "fecha_actualizacion")
+    private LocalDateTime fechaActualizacion;
+
+
     @PrePersist
     @PreUpdate
     protected void onUpdate() {
@@ -83,6 +94,14 @@ public class InventarioCentral {
     @Transient
     public boolean necesitaReposicion() {
         return cantidadActual <= cantidadMinima;
+    }
+
+    @Transient
+    public Integer getCantidadDisponible() {
+        if (this.estado != null && Boolean.TRUE.equals(this.estado.getPermiteUso())) {
+            return this.cantidadActual;
+        }
+        return 0;
     }
 
     @Transient

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import pe.edu.upeu.epp.entity.CatalogoEpp;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +20,7 @@ public class InventarioAreaResponseDTO {
     private String eppCodigoIdentificacion;
     private Integer areaId;
     private String areaNombre;
+    private CatalogoEpp.TipoUso tipoUso;
 
     private Integer estadoId;
     private String estadoNombre;
