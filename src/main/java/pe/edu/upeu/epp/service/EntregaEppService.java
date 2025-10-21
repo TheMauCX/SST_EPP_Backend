@@ -149,12 +149,17 @@ public class EntregaEppService {
             throw new BusinessException("Para EPP consumible, la cantidad debe ser mayor a 0");
         }
 
-        // Buscar inventario del área
-        InventarioArea inventario = inventarioAreaRepository
-                .findByEppIdAndAreaId(epp.getEppId(), area.getAreaId())
-                .orElseThrow(() -> new BusinessException(
-                        "No existe inventario de '" + epp.getNombreEpp() + "' en el área '" + area.getNombreArea() + "'"));
+        // Buscar inventario del área con stock disponible
+        List<InventarioArea> inventarios = inventarioAreaRepository
+                .findByAreaAndEppAndEstadoPermiteUso(area, epp, true);
 
+        InventarioArea inventario = inventarios.stream()
+                .filter(inv -> inv.getCantidadActual() >= item.getCantidad())
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(String.format(
+                        "No existe inventario suficiente de '%s' en el área '%s'",
+                        epp.getNombreEpp(), area.getNombreArea()
+                )));
         // Verificar stock suficiente
         if (inventario.getCantidadActual() < item.getCantidad()) {
             throw new BusinessException(

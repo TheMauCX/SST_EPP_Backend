@@ -18,7 +18,7 @@ SET search_path TO epp;
 
 -- Roles del sistema
 INSERT INTO rol (nombre_rol, descripcion) VALUES
-                                              ('ADMINISTRADOR', 'Gestión completa del sistema, usuarios y catálogos.'),
+                                              ('ADMINISTRADOR_SISTEMA', 'Gestión completa del sistema, usuarios y catálogos.'),
                                               ('SUPERVISOR_SST', 'Gestión de inventario central, aprobaciones y reportes.'),
                                               ('JEFE_AREA', 'Gestión de personal y entregas en su área asignada.'),
                                               ('TRABAJADOR', 'Acceso para solicitar EPP y consultar su historial.')
@@ -63,9 +63,9 @@ VALUES (1, '00000001', 'Admin', 'Global', 1, 'Administrador de Sistema', 'ACTIVO
     ON CONFLICT (trabajador_id) DO UPDATE SET nombres = EXCLUDED.nombres; -- Actualiza si ya existe
 
 -- Crear el usuario Administrador (contraseña: Admin123!)
--- Hash BCrypt para "Admin123!": $2a$10$N9qo8uLOickgx2ZMRZoMye1J8iYLfkYvmH5wJjXJqYvqLqCQmW7rK
+-- Hash BCrypt para "Admin123!": $2a$10$X9X77Kshyvn7J6DAHUu/qOgtHMpPdIfofSOFYCAhAsue4tEIPxLAe
 INSERT INTO usuario (usuario_id, trabajador_id, nombre_usuario, contrasena_hash, email, activo, fecha_creacion)
-VALUES (1, 1, 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMye1J8iYLfkYvmH5wJjXJqYvqLqCQmW7rK', 'admin@empresa.com', TRUE, NOW())
+VALUES (1, 1, 'admin', '$2a$10$X9X77Kshyvn7J6DAHUu/qOgtHMpPdIfofSOFYCAhAsue4tEIPxLAe', 'admin@empresa.com', TRUE, NOW())
     ON CONFLICT (usuario_id) DO UPDATE SET nombre_usuario = EXCLUDED.nombre_usuario; -- Actualiza si ya existe
 
 -- Asignar el rol de Administrador al usuario admin
@@ -79,9 +79,9 @@ VALUES (2, '12345678', 'Supervisor', 'SST', 3, 'Supervisor de Seguridad', 'ACTIV
     ON CONFLICT (trabajador_id) DO UPDATE SET nombres = EXCLUDED.nombres;
 
 -- Crear el usuario Supervisor (contraseña: Super123!)
--- Hash BCrypt para "Super123!": $2a$10$SDzuowK/uweZKOSEy85kKek8pDrsQXa41S3eciZbDw6niLMXv2eFy
+-- Hash BCrypt para "Super123!": $2a$10$ZhO/jZRY9A.H88yJFtH20.OyRsuh8okvoO5E8wzq5g6FfGMgfAp8u
 INSERT INTO usuario (usuario_id, trabajador_id, nombre_usuario, contrasena_hash, email, activo, fecha_creacion)
-VALUES (2, 2, 'supervisor', '$2a$10$SDzuowK/uweZKOSEy85kKek8pDrsQXa41S3eciZbDw6niLMXv2eFy', 'supervisor@empresa.com', TRUE, NOW())
+VALUES (2, 2, 'supervisor', '$2a$10$ZhO/jZRY9A.H88yJFtH20.OyRsuh8okvoO5E8wzq5g6FfGMgfAp8u', 'supervisor@empresa.com', TRUE, NOW())
     ON CONFLICT (usuario_id) DO UPDATE SET nombre_usuario = EXCLUDED.nombre_usuario;
 
 -- Asignar el rol de Supervisor
