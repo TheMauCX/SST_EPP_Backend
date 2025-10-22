@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 public class AjusteInventarioDTO {
 
     @NotNull(message = "La cantidad de ajuste es obligatoria")
-    private Integer cantidadAjuste; // Puede ser positiva (ingreso) o negativa (salida)
+    private Integer cantidadAjuste;
 
     @NotBlank(message = "El motivo es obligatorio")
     @Size(max = 500, message = "El motivo no puede exceder 500 caracteres")
