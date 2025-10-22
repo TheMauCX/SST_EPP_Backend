@@ -52,6 +52,7 @@ public class CatalogoEppService {
                 .nivelProteccion(request.getNivelProteccion())
                 .marca(request.getMarca())
                 .unidadMedida(request.getUnidadMedida())
+                .tallas(request.getTallas())
                 .activo(true)
                 .build();
 
@@ -161,6 +162,10 @@ public class CatalogoEppService {
             catalogoEpp.setUnidadMedida(request.getUnidadMedida());
         }
 
+        if (request.getTallas() != null) { // LÍNEA AÑADIDA
+            catalogoEpp.setTallas(request.getTallas()); // LÍNEA AÑADIDA
+        }
+
         catalogoEpp = catalogoEppRepository.save(catalogoEpp);
 
         log.info("EPP actualizado exitosamente: {}", id);
@@ -202,6 +207,7 @@ public class CatalogoEppService {
                 .activo(catalogoEpp.getActivo())
                 .marca(catalogoEpp.getMarca())
                 .unidadMedida(catalogoEpp.getUnidadMedida())
+                .tallas(catalogoEpp.getTallas())
                 .fechaCreacion(catalogoEpp.getFechaCreacion())
                 .fechaActualizacion(catalogoEpp.getFechaActualizacion())
                 .build();

@@ -33,6 +33,9 @@ public class CatalogoEppUpdateDTO {
     @Size(max = 100, message = "La marca no puede exceder 100 caracteres")
     private String marca;
 
+    @Size(max = 100, message = "Las tallas no pueden exceder 100 caracteres")
+    private String tallas;
+
     @Size(max = 20, message = "La unidad de medida no puede exceder 20 caracteres")
     @Pattern(regexp = "^(UNI|PAR|CAJA|SET|KIT|ROLLO|PAQUETE|METRO|LITRO)?$",
             message = "Unidad de medida inválida")

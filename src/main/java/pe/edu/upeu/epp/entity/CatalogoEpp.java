@@ -34,7 +34,6 @@ public class CatalogoEpp {
     @Column(name = "especificaciones_tecnicas", columnDefinition = "TEXT")
     private String especificacionesTecnicas;
 
-
     @Column(name = "vida_util_meses")
     private Integer vidaUtilMeses;
 

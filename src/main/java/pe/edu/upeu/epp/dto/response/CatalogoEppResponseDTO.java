@@ -26,4 +26,5 @@ public class CatalogoEppResponseDTO {
     private LocalDateTime fechaActualizacion;
     private String marca;
     private String unidadMedida;
+    private String tallas;
 }

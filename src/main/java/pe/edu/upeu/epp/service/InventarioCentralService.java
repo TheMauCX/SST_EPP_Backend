@@ -20,6 +20,7 @@ import pe.edu.upeu.epp.repository.EstadoEppRepository;
 import pe.edu.upeu.epp.repository.InventarioCentralRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -74,6 +75,7 @@ public class InventarioCentralService {
                 .proveedor(request.getProveedor())
                 .fechaVencimiento(request.getFechaVencimiento())
                 .observaciones(request.getObservaciones())
+                .fechaCreacion(LocalDateTime.now())
                 .build();
 
         InventarioCentral guardado = inventarioCentralRepository.save(inventario);

@@ -133,7 +133,7 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:5354",
                 "https://app.upeu.edu.pe",
-                "http://localhost:59927",
+                "http://localhost:61197",
                 "http://10.0.2.2:8080"
         ));
 // Métodos HTTP permitidos

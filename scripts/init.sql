@@ -70,7 +70,7 @@ VALUES (1, 1, 'admin', '$2a$10$X9X77Kshyvn7J6DAHUu/qOgtHMpPdIfofSOFYCAhAsue4tEIP
 
 -- Asignar el rol de Administrador al usuario admin
 INSERT INTO usuario_rol (usuario_id, rol_id)
-VALUES (1, (SELECT rol_id FROM rol WHERE nombre_rol = 'ADMINISTRADOR'))
+VALUES (1, (SELECT rol_id FROM rol WHERE nombre_rol = 'ADMINISTRADOR_SISTEMA'))
     ON CONFLICT (usuario_id, rol_id) DO NOTHING;
 
 -- Crear un trabajador para el usuario Supervisor
