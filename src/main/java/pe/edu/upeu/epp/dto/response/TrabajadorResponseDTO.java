@@ -24,7 +24,7 @@ public class TrabajadorResponseDTO {
     private String codigoQrPhotocheck;
     private Integer areaId;
     private String areaNombre;
-    private String puesto;
+    private String cargo;
     private java.time.LocalDate fechaIngreso;
     private String telefono;
     private String email;

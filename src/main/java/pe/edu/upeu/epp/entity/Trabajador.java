@@ -43,8 +43,8 @@ public class Trabajador {
     @JoinColumn(name = "area_id", nullable = false)
     private Area area;
 
-    @Column(name = "puesto", length = 100)
-    private String puesto;
+    @Column(name = "cargo", length = 100)
+    private String cargo;
 
     @Column(name = "fecha_ingreso")
     private java.time.LocalDate fechaIngreso;

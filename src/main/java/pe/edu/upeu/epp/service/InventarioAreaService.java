@@ -273,7 +273,7 @@ public class InventarioAreaService {
                     .cantidadActual(request.getCantidad())
                     .cantidadMinima(5)
                     .cantidadMaxima(request.getCantidad() * 2)
-                    .ubicacion("Transferido desde central")
+                    .ubicacion("Almacen "+area.getNombreArea())
                     .build();
             log.info("Nuevo inventario de área creado con {} unidades", request.getCantidad());
         }

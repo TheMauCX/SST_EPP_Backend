@@ -19,7 +19,7 @@ public class TrabajadorQrResponseDTO {
     private String dni;
     private String codigoQrPhotocheck;
     private String areaNombre;
-    private String puesto;
+    private String cargo;
 
     /**
      * URL para generar imagen del código QR.

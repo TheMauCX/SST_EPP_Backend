@@ -60,7 +60,7 @@ public class TrabajadorService {
                 .apellidos(request.getApellidos())
                 .codigoQrPhotocheck(codigoQr)
                 .area(area)
-                .puesto(request.getPuesto())
+                .cargo(request.getCargo())
                 .fechaIngreso(request.getFechaIngreso() != null ? request.getFechaIngreso() : LocalDate.now())
                 .telefono(request.getTelefono())
                 .email(request.getEmail())
@@ -193,8 +193,8 @@ public class TrabajadorService {
             trabajador.setArea(area);
         }
 
-        if (request.getPuesto() != null) {
-            trabajador.setPuesto(request.getPuesto());
+        if (request.getCargo() != null) {
+            trabajador.setCargo(request.getCargo());
         }
 
         if (request.getFechaIngreso() != null) {
@@ -291,7 +291,7 @@ public class TrabajadorService {
                 .codigoQrPhotocheck(trabajador.getCodigoQrPhotocheck())
                 .areaId(trabajador.getArea().getAreaId())
                 .areaNombre(trabajador.getArea().getNombreArea())
-                .puesto(trabajador.getPuesto())
+                .cargo(trabajador.getCargo())
                 .fechaIngreso(trabajador.getFechaIngreso())
                 .telefono(trabajador.getTelefono())
                 .email(trabajador.getEmail())
@@ -314,7 +314,7 @@ public class TrabajadorService {
                 .dni(trabajador.getDni())
                 .codigoQrPhotocheck(trabajador.getCodigoQrPhotocheck())
                 .areaNombre(trabajador.getArea().getNombreArea())
-                .puesto(trabajador.getPuesto())
+                .cargo(trabajador.getCargo())
                 .qrImageUrl(qrImageUrl)
                 .build();
     }

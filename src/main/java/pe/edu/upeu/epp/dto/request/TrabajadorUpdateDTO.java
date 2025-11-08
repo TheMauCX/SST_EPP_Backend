@@ -26,8 +26,8 @@ public class TrabajadorUpdateDTO {
 
     private Integer areaId;
 
-    @Size(max = 100, message = "El puesto no puede exceder 100 caracteres")
-    private String puesto;
+    @Size(max = 100, message = "El cargo no puede exceder 100 caracteres")
+    private String cargo;
 
     @Past(message = "La fecha de ingreso debe ser en el pasado")
     private LocalDate fechaIngreso;
