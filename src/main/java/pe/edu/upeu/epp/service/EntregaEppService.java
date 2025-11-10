@@ -306,7 +306,7 @@ public class EntregaEppService {
                 .trabajadorNombre(entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos())
                 .trabajadorDni(entrega.getTrabajador().getDni())
                 .trabajadorArea(entrega.getTrabajador().getArea().getNombreArea())
-                .trabajadorPuesto(entrega.getTrabajador().getPuesto())
+                .trabajadorPuesto(entrega.getTrabajador().getCargo())
                 .jefeAreaId(entrega.getJefeArea().getTrabajadorId())
                 .jefeAreaNombre(entrega.getJefeArea().getNombres() + " " + entrega.getJefeArea().getApellidos())
                 .fechaEntrega(entrega.getFechaEntrega())

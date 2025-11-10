@@ -133,8 +133,10 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:5354",
                 "https://app.upeu.edu.pe",
-                "http://localhost:61197",
-                "http://10.0.2.2:8080"
+                "http://localhost:63233",
+                "http://10.0.2.2:8080",
+                "http://10.125.67.149:8080"
+
         ));
 // Métodos HTTP permitidos
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
