@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_usuario_activo", columnList = "activo")
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class Usuario {
+public class Usuario{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,6 +52,12 @@ public class Usuario {
 
     @Column(name = "bloqueado_hasta")
     private LocalDateTime bloqueadoHasta;
+
+    @Column(name = "reset_token")
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

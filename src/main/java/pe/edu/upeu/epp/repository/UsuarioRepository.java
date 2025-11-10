@@ -25,7 +25,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     @Query("SELECT u FROM Usuario u JOIN u.roles r WHERE r.nombreRol = :nombreRol AND u.activo = true")
     List<Usuario> findByRoles_NombreRol(@Param("nombreRol") String nombreRol);
-
+    Optional<Usuario> findByResetToken(String resetToken);
     boolean existsByNombreUsuario(String nombreUsuario);
     boolean existsByEmail(String email);
 }

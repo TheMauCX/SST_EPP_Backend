@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import pe.edu.upeu.epp.entity.Area;
 import pe.edu.upeu.epp.entity.Trabajador;
+import pe.edu.upeu.epp.entity.Usuario;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,4 +31,6 @@ public interface TrabajadorRepository extends JpaRepository<Trabajador, Integer>
             "LOWER(CONCAT(t.nombres, ' ', t.apellidos)) LIKE LOWER(CONCAT('%', :nombre, '%')) " +
             "ORDER BY t.apellidos, t.nombres")
     List<Trabajador> buscarPorNombre(@Param("nombre") String nombre);
+
+    Optional<Trabajador> findByEmail(String email);
 }

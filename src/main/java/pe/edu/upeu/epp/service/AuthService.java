@@ -7,16 +7,23 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pe.edu.upeu.epp.dto.request.ForgotPasswordRequestDTO;
 import pe.edu.upeu.epp.dto.request.LoginRequestDTO;
 import pe.edu.upeu.epp.dto.request.RefreshTokenRequestDTO;
+import pe.edu.upeu.epp.dto.request.ResetPasswordRequestDTO;
 import pe.edu.upeu.epp.dto.response.AuthResponseDTO;
+import pe.edu.upeu.epp.entity.Trabajador;
 import pe.edu.upeu.epp.entity.Usuario;
 import pe.edu.upeu.epp.exception.BusinessException;
+import pe.edu.upeu.epp.repository.TrabajadorRepository;
 import pe.edu.upeu.epp.repository.UsuarioRepository;
 import pe.edu.upeu.epp.security.JwtService;
 import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 /**
 
@@ -29,7 +36,11 @@ import java.util.stream.Collectors;
 public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UsuarioRepository usuarioRepository;
+    private final TrabajadorRepository trabajadorRepository;
     private final JwtService jwtService;
+    private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
+
     /**
 
      Autentica un usuario y genera tokens JWT.
@@ -142,6 +153,95 @@ public class AuthService {
                 });
 // TODO: Si se implementa lista negra de tokens, agregar el token aquí
     }
+
+    /**
+     * Lógica para solicitar un reseteo de contraseña.
+     * Genera un token y "envía" un correo (log en consola).
+     */
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequestDTO request) {
+        String input = request.getUsernameOrEmail();
+        Optional<Usuario> usuarioParaReset = Optional.empty();
+
+        // Estrategia 1: Buscar por USERNAME (ej. "jefe.area.1")
+        usuarioParaReset = usuarioRepository.findByNombreUsuario(input);
+
+        // Estrategia 2: Si no se encontró, buscar por EMAIL DE CUENTA (ej. "cuenta@upeu.edu.pe")
+        if (!usuarioParaReset.isPresent()) {
+            usuarioParaReset = usuarioRepository.findByEmail(input);
+        }
+
+        // Estrategia 3: Si no, buscar por EMAIL DE TRABAJADOR (ej. "personal@empresa.com")
+        if (!usuarioParaReset.isPresent()) {
+            Optional<Trabajador> trabajador = trabajadorRepository.findByEmail(input);
+            if (trabajador.isPresent()) {
+                // Si encontramos al trabajador, buscamos al usuario que lo tiene vinculado
+                usuarioParaReset = usuarioRepository.findByTrabajador(trabajador.get());
+            }
+        }
+
+        // Si CUALQUIERA de las 3 estrategias encontró un usuario, procedemos
+        if (usuarioParaReset.isPresent()) {
+            Usuario usuario = usuarioParaReset.get();
+
+            // Determinar a qué email enviar el correo.
+            // Prioridad 1: Email de la cuenta (usuario.email)
+            // Prioridad 2: Email del trabajador (usuario.trabajador.email)
+            String emailDestino = null;
+            if (usuario.getEmail() != null && !usuario.getEmail().isEmpty()) {
+                emailDestino = usuario.getEmail();
+            } else if (usuario.getTrabajador() != null && usuario.getTrabajador().getEmail() != null) {
+                emailDestino = usuario.getTrabajador().getEmail();
+            }
+
+            // Si encontramos un email válido, generamos y "enviamos" el token
+            if (emailDestino != null) {
+                generarYEnviarToken(usuario, emailDestino);
+            }
+        }
+    }
+
+    private void generarYEnviarToken(Usuario usuario, String email) {
+        String token = UUID.randomUUID().toString();
+        LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(15);
+
+        usuario.setResetToken(token);
+        usuario.setResetTokenExpiry(expiryDate);
+        usuarioRepository.save(usuario);
+
+        // Llamada al servicio simulado (log en consola)
+        emailService.sendPasswordResetEmail(email, token);
+    }
+
+    /**
+     * Lógica para actualizar la contraseña usando el token.
+     */
+    @Transactional
+    public void resetPassword(ResetPasswordRequestDTO request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException("Las contraseñas no coinciden");
+        }
+
+        Usuario usuario = usuarioRepository.findByResetToken(request.getToken())
+                .orElseThrow(() -> new BusinessException("Token inválido o no encontrado"));
+
+        if (usuario.getResetTokenExpiry() == null || usuario.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            if(usuario.getResetTokenExpiry() != null) {
+                usuario.setResetToken(null);
+                usuario.setResetTokenExpiry(null);
+                usuarioRepository.save(usuario);
+            }
+            throw new BusinessException("Token ha expirado");
+        }
+
+        // Usa el nombre de campo correcto de tu entidad
+        usuario.setContrasenaHash(passwordEncoder.encode(request.getNewPassword()));
+        usuario.setResetToken(null);
+        usuario.setResetTokenExpiry(null);
+
+        usuarioRepository.save(usuario);
+    }
+
 
     /**
 

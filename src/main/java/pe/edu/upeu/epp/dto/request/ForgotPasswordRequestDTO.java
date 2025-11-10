@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ForgotPasswordRequestDTO {
-    @NotBlank(message = "El email es obligatorio")
-    @Email(message = "Debe proporcionar un email válido")
-    private String email;
+    @NotBlank(message = "El nombre de usuario o correo no puede estar vacío")
+    private String usernameOrEmail; // El usuario puede ingresar su username o su email
 }
