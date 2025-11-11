@@ -116,4 +116,6 @@ public interface InventarioAreaRepository extends JpaRepository<InventarioArea, 
      * Encuentra inventarios de un EPP con un estado específico.
      */
     List<InventarioArea> findByEppAndEstado(CatalogoEpp epp, EstadoEpp estado);
+
+    Optional<InventarioArea> findByAreaAndEppAndEstado(Area area, CatalogoEpp epp, EstadoEpp estado);
 }

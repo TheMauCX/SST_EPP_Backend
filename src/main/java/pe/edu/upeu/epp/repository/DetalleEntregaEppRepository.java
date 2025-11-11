@@ -17,6 +17,7 @@ public interface DetalleEntregaEppRepository extends JpaRepository<DetalleEntreg
     List<DetalleEntregaEpp> findByEntrega(EntregaEpp entrega);
     List<DetalleEntregaEpp> findByEpp(CatalogoEpp epp);
 
+
     @Query("SELECT dee FROM DetalleEntregaEpp dee WHERE dee.entrega.trabajador.trabajadorId = :trabajadorId")
     List<DetalleEntregaEpp> findByTrabajadorId(@Param("trabajadorId") Integer trabajadorId);
 

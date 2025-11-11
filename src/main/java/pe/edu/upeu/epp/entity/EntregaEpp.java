@@ -27,7 +27,7 @@ public class EntregaEpp {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "jefe_area_id", nullable = false)
-    private Trabajador jefeArea;
+    private Usuario jefeArea;
 
     @Column(name = "fecha_entrega", nullable = false)
     private LocalDateTime fechaEntrega;

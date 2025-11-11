@@ -25,5 +25,5 @@ public class EntregaEppResponseDTO {
     private EntregaEpp.TipoEntrega tipoEntrega;
     private String observaciones;
     private String status;
-    private List<DetalleEntregaDTO> items;
+    private List<DetalleEntregaDTO> detalles;
 }

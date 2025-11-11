@@ -29,10 +29,6 @@ public class DetalleEntregaEpp {
     @JoinColumn(name = "epp_id", nullable = false)
     private CatalogoEpp epp;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "instancia_epp_id")
-    private InstanciaEpp instanciaEpp;
-
     @Min(1)
     @Column(name = "cantidad")
     private Integer cantidad;

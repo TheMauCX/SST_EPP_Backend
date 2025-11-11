@@ -1,10 +1,8 @@
 package pe.edu.upeu.epp.service;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page; // <-- IMPORTANTE
+import org.springframework.data.domain.Pageable; // <-- IMPORTANTE
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.epp.dto.request.EntregaEppRequestDTO;
@@ -16,323 +14,292 @@ import pe.edu.upeu.epp.entity.*;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
-/**
- * Servicio de lógica de negocio para Entregas de EPP.
- * CRÍTICO: Garantiza integridad del inventario con transacciones atómicas.
- */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class EntregaEppService {
 
+    // Repositorios principales
     private final EntregaEppRepository entregaEppRepository;
     private final DetalleEntregaEppRepository detalleEntregaEppRepository;
     private final TrabajadorRepository trabajadorRepository;
-    private final UsuarioRepository usuarioRepository;
     private final CatalogoEppRepository catalogoEppRepository;
     private final InventarioAreaRepository inventarioAreaRepository;
+    private final UsuarioRepository usuarioRepository;
+
+    // Repositorios para la nueva lógica (HU-8)
     private final InstanciaEppRepository instanciaEppRepository;
     private final EstadoEppRepository estadoEppRepository;
 
-    /**
-     * Registrar entrega de EPP (TRANSACCIÓN ATÓMICA).
-     * Este es el flujo más crítico del sistema.
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public EntregaEppResponseDTO registrarEntrega(EntregaEppRequestDTO request) {
-        log.info("==== INICIANDO REGISTRO DE ENTREGA ====");
-        log.info("Trabajador ID: {}, Jefe Área ID: {}, Items: {}",
-                request.getTrabajadorId(), request.getJefeAreaId(), request.getItems().size());
+    @Transactional
+    public EntregaEppResponseDTO registrarEntregaEpp(EntregaEppRequestDTO entregaEppRequestDTO, String username) {
 
-        // ========================================
-        // 1. VALIDACIONES INICIALES
-        // ========================================
+        // --- PASO 1: OBTENER CONTEXTO (Usuario, Trabajador, Jefe de Área) ---
+        Usuario jefeAreaUsuario = usuarioRepository.findByNombreUsuario(username)
+                .orElseThrow(() -> new BusinessException("Usuario no encontrado: " + username));
 
-        // Validar trabajador
-        Trabajador trabajador = trabajadorRepository.findById(request.getTrabajadorId())
-                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado con ID: " + request.getTrabajadorId()));
-
-        if (trabajador.getEstado() != Trabajador.EstadoTrabajador.ACTIVO) {
-            throw new BusinessException("El trabajador no está activo. Estado: " + trabajador.getEstado());
+        Area areaDelJefe;
+        if (jefeAreaUsuario.getTrabajador() != null) {
+            areaDelJefe = jefeAreaUsuario.getTrabajador().getArea();
+        } else {
+            areaDelJefe = null;
         }
 
-        // Validar jefe de área
-        Usuario jefeAreaUsuario = usuarioRepository.findById(request.getJefeAreaId())
-                .orElseThrow(() -> new EntityNotFoundException("Usuario jefe de área no encontrado"));
-
-        Trabajador jefeArea = jefeAreaUsuario.getTrabajador();
-        if (jefeArea == null) {
-            throw new BusinessException("El usuario no tiene un trabajador asociado");
+        if (areaDelJefe == null) {
+            throw new BusinessException("El Jefe de Área '" + username + "' no está asignado a un área y no puede descontar stock.");
         }
 
-        // Validar que el jefe pertenece al área del trabajador
-        if (!jefeArea.getArea().getAreaId().equals(trabajador.getArea().getAreaId())) {
-            throw new BusinessException(
-                    String.format("El jefe de área pertenece a '%s' pero el trabajador pertenece a '%s'",
-                            jefeArea.getArea().getNombreArea(), trabajador.getArea().getNombreArea())
-            );
-        }
+        Trabajador trabajador = trabajadorRepository.findById(entregaEppRequestDTO.getTrabajadorId())
+                .orElseThrow(() -> new BusinessException("Trabajador no encontrado con ID: " + entregaEppRequestDTO.getTrabajadorId()));
 
-        log.debug("Validaciones iniciales completadas");
+        // --- PASO 2: OBTENER ESTADO INICIAL (FUERA DEL LOOP) ---
+        EstadoEpp estadoInicial = estadoEppRepository.findByNombre("NUEVO")
+                .orElseThrow(() -> new BusinessException("Estado 'NUEVO' no está configurado en la base de datos (tabla estado_epp)."));
 
-        // ========================================
-        // 2. PROCESAR CADA ITEM (CRÍTICO)
-        // ========================================
+        // --- PASO 3: CREAR EL REGISTRO MAESTRO DE ENTREGA ---
+        EntregaEpp entrega = new EntregaEpp();
+        entrega.setJefeArea(jefeAreaUsuario);
+        entrega.setTrabajador(trabajador);
+        entrega.setFechaEntrega(LocalDateTime.now());
+        entrega.setTipoEntrega(entregaEppRequestDTO.getTipoEntrega());
+        entrega.setObservaciones(entregaEppRequestDTO.getObservaciones());
 
-        List<DetalleEntregaEpp> detalles = new ArrayList<>();
+        EntregaEpp entregaGuardada = entregaEppRepository.save(entrega);
 
-        for (ItemEntregaDTO item : request.getItems()) {
-            log.debug("Procesando item - EPP ID: {}", item.getEppId());
+        // Esta lista contendrá los DTOs de respuesta.
+        List<DetalleEntregaDTO> detallesRespuestaDTO = new ArrayList<>();
 
-            CatalogoEpp epp = catalogoEppRepository.findById(item.getEppId())
-                    .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + item.getEppId()));
+        // --- PASO 4: PROCESAR CADA ITEM (Validar, Descontar, Crear Detalle, Crear Instancias) ---
+        for (ItemEntregaDTO item : entregaEppRequestDTO.getItems()) {
 
-            DetalleEntregaEpp detalle;
+            CatalogoEpp catalogoEpp = catalogoEppRepository.findById(item.getEppId())
+                    .orElseThrow(() -> new BusinessException("Catalogo EPP no encontrado con ID: " + item.getEppId()));
 
-            if (epp.getTipoUso() == CatalogoEpp.TipoUso.CONSUMIBLE) {
-                // Procesar EPP CONSUMIBLE
-                detalle = procesarEntregaConsumible(item, epp, trabajador.getArea());
-            } else {
-                // Procesar EPP DURADERO
-                detalle = procesarEntregaDuradero(item, epp, trabajador);
+            InventarioArea inventarioArea = inventarioAreaRepository.findByAreaAndEppAndEstado(areaDelJefe, catalogoEpp, estadoInicial)
+                    .orElseThrow(() -> new BusinessException("Stock 'NUEVO' no encontrado para '" + catalogoEpp.getNombreEpp() + "' en el área '" + areaDelJefe.getNombreArea() + "'."));
+
+            if (inventarioArea.getCantidadActual() < item.getCantidad()) {
+                throw new BusinessException("Stock insuficiente para: '" + catalogoEpp.getNombreEpp() + "'. Solicitado: " + item.getCantidad() + ", Disponible: " + inventarioArea.getCantidadActual());
             }
 
-            detalles.add(detalle);
+            inventarioArea.setCantidadActual(inventarioArea.getCantidadActual() - item.getCantidad());
+            inventarioAreaRepository.save(inventarioArea);
+
+            DetalleEntregaEpp detalle = new DetalleEntregaEpp();
+            detalle.setEntrega(entregaGuardada);
+            detalle.setEpp(catalogoEpp);
+            detalle.setCantidad(item.getCantidad());
+
+            DetalleEntregaEpp detalleGuardado = detalleEntregaEppRepository.save(detalle);
+
+            // --- PASO 5: LÓGICA DURADERO vs CONSUMIBLE ---
+            if (catalogoEpp.getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
+                for (int i = 0; i < item.getCantidad(); i++) {
+                    InstanciaEpp instancia = new InstanciaEpp();
+                    instancia.setDetalleEntrega(detalleGuardado);
+                    instancia.setEpp(catalogoEpp);
+                    instancia.setEstado(estadoInicial);
+                    instancia.setTrabajadorActual(trabajador);
+                    instancia.setAreaActual(trabajador.getArea());
+                    instancia.setCodigoSerie(UUID.randomUUID().toString());
+                    instancia.setFechaAdquisicion(LocalDate.now());
+
+                    InstanciaEpp instanciaGuardada = instanciaEppRepository.save(instancia);
+                    detallesRespuestaDTO.add(convertirInstanciaADetalleDTO(instanciaGuardada));
+                }
+            } else {
+                detallesRespuestaDTO.add(convertirDetalleConsumibleADetalleDTO(detalleGuardado));
+            }
         }
 
-        log.debug("Todos los items procesados exitosamente");
+        // --- PASO 6: CONSTRUIR Y DEVOLVER LA RESPUESTA ---
+        return convertirAEntregaResponseDTO(entregaGuardada, detallesRespuestaDTO);
+    }
 
-        // ========================================
-        // 3. CREAR REGISTRO DE ENTREGA
-        // ========================================
+    // --- Métodos de Consulta (ACTUALIZADOS CON PAGINACIÓN) ---
 
-        EntregaEpp entrega = EntregaEpp.builder()
-                .trabajador(trabajador)
-                .jefeArea(jefeArea)
-                .fechaEntrega(LocalDateTime.now())
-                .tipoEntrega(request.getTipoEntrega())
-                .observaciones(request.getObservaciones())
-                .firmaDigital(request.getFirmaDigital())
-                .status("COMPLETADA")
-                .build();
+    /**
+     * Devuelve una lista paginada de todas las entregas.
+     */
+    public Page<EntregaEppResponseDTO> findAllEntregas(Pageable pageable) {
+        // CAMBIO: Se llama a findAll(pageable) y se usa .map para convertir
+        Page<EntregaEpp> entregaPage = entregaEppRepository.findAll(pageable);
+        return entregaPage.map(this::convertirAEntregaResponseDTO);
+    }
 
-        entrega = entregaEppRepository.save(entrega);
-        log.info("Entrega creada con ID: {}", entrega.getEntregaId());
+    /**
+     * Busca una entrega por su ID y devuelve el detalle completo.
+     */
+    public EntregaDetalleResponseDTO findEntregaById(Integer id) {
+        EntregaEpp entregaEpp = entregaEppRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Entrega no encontrada con ID: " + id));
 
-        // ========================================
-        // 4. ASOCIAR DETALLES A LA ENTREGA
-        // ========================================
+        List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entregaEpp);
 
+        List<DetalleEntregaDTO> detallesRespuestaDTO = new ArrayList<>();
         for (DetalleEntregaEpp detalle : detalles) {
-            detalle.setEntrega(entrega);
-        }
-        detalleEntregaEppRepository.saveAll(detalles);
-
-        log.info("==== ENTREGA COMPLETADA EXITOSAMENTE - ID: {} ====", entrega.getEntregaId());
-
-        return mapToResponseDTO(entrega, detalles);
-    }
-
-    /**
-     * Procesar entrega de EPP CONSUMIBLE.
-     * Resta del inventario del área.
-     */
-    private DetalleEntregaEpp procesarEntregaConsumible(ItemEntregaDTO item, CatalogoEpp epp, Area area) {
-        log.debug("Procesando EPP CONSUMIBLE: {} - Cantidad: {}", epp.getNombreEpp(), item.getCantidad());
-
-        if (item.getCantidad() == null || item.getCantidad() <= 0) {
-            throw new BusinessException("Para EPP consumible, la cantidad debe ser mayor a 0");
+            if (detalle.getEpp().getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
+                List<InstanciaEpp> instancias = instanciaEppRepository.findByDetalleEntrega(detalle);
+                for (InstanciaEpp instancia : instancias) {
+                    detallesRespuestaDTO.add(convertirInstanciaADetalleDTO(instancia));
+                }
+            } else {
+                detallesRespuestaDTO.add(convertirDetalleConsumibleADetalleDTO(detalle));
+            }
         }
 
-        // Buscar inventario del área con stock disponible
-        List<InventarioArea> inventarios = inventarioAreaRepository
-                .findByAreaAndEppAndEstadoPermiteUso(area, epp, true);
+        // Construimos el DTO de respuesta detallado
+        Trabajador trabajador = entregaEpp.getTrabajador();
+        Usuario jefeArea = entregaEpp.getJefeArea();
+        String jefeAreaNombre = null;
+        Integer jefeAreaId = null;
 
-        InventarioArea inventario = inventarios.stream()
-                .filter(inv -> inv.getCantidadActual() >= item.getCantidad())
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(String.format(
-                        "No existe inventario suficiente de '%s' en el área '%s'",
-                        epp.getNombreEpp(), area.getNombreArea()
-                )));
-        // Verificar stock suficiente
-        if (inventario.getCantidadActual() < item.getCantidad()) {
-            throw new BusinessException(
-                    String.format("Stock insuficiente. Disponible: %d, Solicitado: %d para '%s'",
-                            inventario.getCantidadActual(), item.getCantidad(), epp.getNombreEpp())
-            );
+        if (jefeArea != null) {
+            jefeAreaId = jefeArea.getUsuarioId();
+            if (jefeArea.getTrabajador() != null) {
+                jefeAreaNombre = jefeArea.getTrabajador().getNombres() + " " + jefeArea.getTrabajador().getApellidos();
+            } else {
+                jefeAreaNombre = jefeArea.getNombreUsuario();
+            }
         }
 
-        // RESTAR STOCK (CRÍTICO)
-        inventario.setCantidadActual(inventario.getCantidadActual() - item.getCantidad());
-        inventarioAreaRepository.save(inventario);
+        int totalItems = detallesRespuestaDTO.stream().mapToInt(DetalleEntregaDTO::getCantidad).sum();
 
-        log.info("Stock actualizado - EPP: {}, Nueva cantidad: {}",
-                epp.getNombreEpp(), inventario.getCantidadActual());
-
-        // Crear detalle
-        return DetalleEntregaEpp.builder()
-                .epp(epp)
-                .cantidad(item.getCantidad())
-                .motivo(item.getMotivo())
+        return EntregaDetalleResponseDTO.builder()
+                .entregaId(entregaEpp.getEntregaId())
+                .trabajadorId(trabajador.getTrabajadorId())
+                .trabajadorNombre(trabajador.getNombres() + " " + trabajador.getApellidos())
+                .trabajadorDni(trabajador.getDni())
+                .trabajadorArea(trabajador.getArea() != null ? trabajador.getArea().getNombreArea() : null)
+                .trabajadorPuesto(trabajador.getCargo())
+                .jefeAreaId(jefeAreaId)
+                .jefeAreaNombre(jefeAreaNombre)
+                .fechaEntrega(entregaEpp.getFechaEntrega())
+                .tipoEntrega(entregaEpp.getTipoEntrega())
+                .observaciones(entregaEpp.getObservaciones())
+                .status(entregaEpp.getStatus())
+                .items(detallesRespuestaDTO)
+                .totalItems(totalItems)
                 .build();
     }
 
     /**
-     * Procesar entrega de EPP DURADERO.
-     * Actualiza el estado de la instancia.
+     * Devuelve una lista paginada de entregas por ID de trabajador.
      */
-    private DetalleEntregaEpp procesarEntregaDuradero(ItemEntregaDTO item, CatalogoEpp epp, Trabajador trabajador) {
-        log.debug("Procesando EPP DURADERO: {} - Instancia ID: {}", epp.getNombreEpp(), item.getInstanciaEppId());
+    public Page<EntregaEppResponseDTO> findEntregasByTrabajadorId(Integer trabajadorId, Pageable pageable) {
+        Trabajador trabajador = trabajadorRepository.findById(trabajadorId)
+                .orElseThrow(() -> new BusinessException("Trabajador no encontrado con ID: " + trabajadorId));
 
-        if (item.getInstanciaEppId() == null) {
-            throw new BusinessException("Para EPP duradero, el ID de instancia es obligatorio");
-        }
-
-        // Buscar instancia
-        InstanciaEpp instancia = instanciaEppRepository.findById(item.getInstanciaEppId())
-                .orElseThrow(() -> new EntityNotFoundException("Instancia EPP no encontrada con ID: " + item.getInstanciaEppId()));
-
-        // Verificar que sea del mismo tipo de EPP
-        if (!instancia.getEpp().getEppId().equals(epp.getEppId())) {
-            throw new BusinessException("La instancia no corresponde al tipo de EPP seleccionado");
-        }
-
-        // Verificar que esté disponible
-        EstadoEpp estadoStock = estadoEppRepository.findByNombre("EN_STOCK")
-                .orElseThrow(() -> new EntityNotFoundException("Estado EN_STOCK no encontrado"));
-
-        if (!instancia.getEstado().getEstadoId().equals(estadoStock.getEstadoId())) {
-            throw new BusinessException(
-                    String.format("La instancia no está disponible. Estado actual: %s",
-                            instancia.getEstado().getNombre())
-            );
-        }
-
-        // ACTUALIZAR ESTADO A "ENTREGADO" (CRÍTICO)
-        EstadoEpp estadoEntregado = estadoEppRepository.findByNombre("ENTREGADO")
-                .orElseThrow(() -> new EntityNotFoundException("Estado ENTREGADO no encontrado"));
-
-        instancia.setEstado(estadoEntregado);
-        instancia.setTrabajadorActual(trabajador);
-        instancia.setAreaActual(trabajador.getArea());
-        instanciaEppRepository.save(instancia);
-
-        log.info("Instancia actualizada - Código: {}, Estado: ENTREGADO, Trabajador: {}",
-                instancia.getCodigoSerie(), trabajador.getNombres());
-
-        // Crear detalle
-        return DetalleEntregaEpp.builder()
-                .epp(epp)
-                .instanciaEpp(instancia)
-                .cantidad(1)
-                .motivo(item.getMotivo())
-                .build();
+        // CAMBIO: Se llama al nuevo método del repositorio que acepta Pageable
+        Page<EntregaEpp> entregaPage = entregaEppRepository.findByTrabajador(trabajador, pageable);
+        return entregaPage.map(this::convertirAEntregaResponseDTO);
     }
 
     /**
-     * Obtener entrega por ID con detalles completos.
+     * Devuelve una lista paginada de entregas por DNI de trabajador.
      */
-    @Transactional(readOnly = true)
-    public EntregaDetalleResponseDTO obtenerDetalle(Integer id) {
-        log.debug("Obteniendo detalle de entrega: {}", id);
+    public Page<EntregaEppResponseDTO> findEntregasByTrabajadorDni(String dni, Pageable pageable) {
+        Trabajador trabajador = trabajadorRepository.findByDni(dni)
+                .orElseThrow(() -> new BusinessException("Trabajador no encontrado con DNI: " + dni));
 
-        EntregaEpp entrega = entregaEppRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Entrega no encontrada con ID: " + id));
+        // CAMBIO: Se llama al nuevo método del repositorio que acepta Pageable
+        Page<EntregaEpp> entregaPage = entregaEppRepository.findByTrabajador(trabajador, pageable);
+        return entregaPage.map(this::convertirAEntregaResponseDTO);
+    }
 
+
+    // --- Métodos de Conversión (Helpers) ---
+
+    /**
+     * Convierte una entidad EntregaEpp a su DTO de respuesta.
+     * (Carga perezosa de detalles)
+     */
+    private EntregaEppResponseDTO convertirAEntregaResponseDTO(EntregaEpp entrega) {
         List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entrega);
 
-        return mapToDetalleResponseDTO(entrega, detalles);
+        List<DetalleEntregaDTO> detallesRespuestaDTO = new ArrayList<>();
+        for (DetalleEntregaEpp detalle : detalles) {
+            if (detalle.getEpp().getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
+                List<InstanciaEpp> instancias = instanciaEppRepository.findByDetalleEntrega(detalle);
+                for (InstanciaEpp instancia : instancias) {
+                    detallesRespuestaDTO.add(convertirInstanciaADetalleDTO(instancia));
+                }
+            } else {
+                detallesRespuestaDTO.add(convertirDetalleConsumibleADetalleDTO(detalle));
+            }
+        }
+
+        return convertirAEntregaResponseDTO(entrega, detallesRespuestaDTO);
     }
 
     /**
-     * Listar entregas con paginación.
+     * Convierte una entidad EntregaEpp y su lista de detalles DTO a la respuesta final.
      */
-    @Transactional(readOnly = true)
-    public Page<EntregaEppResponseDTO> listarTodas(Pageable pageable) {
-        return entregaEppRepository.findAll(pageable)
-                .map(entrega -> {
-                    List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entrega);
-                    return mapToResponseDTO(entrega, detalles);
-                });
-    }
+    private EntregaEppResponseDTO convertirAEntregaResponseDTO(EntregaEpp entrega, List<DetalleEntregaDTO> detallesDTO) {
 
-    /**
-     * Listar entregas por trabajador.
-     */
-    @Transactional(readOnly = true)
-    public Page<EntregaEppResponseDTO> listarPorTrabajador(Integer trabajadorId, Pageable pageable) {
-        Trabajador trabajador = trabajadorRepository.findById(trabajadorId)
-                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        String jefeAreaNombre = null;
+        if (entrega.getJefeArea() != null) {
+            if (entrega.getJefeArea().getTrabajador() != null) {
+                jefeAreaNombre = entrega.getJefeArea().getTrabajador().getNombres() + " " + entrega.getJefeArea().getTrabajador().getApellidos();
+            } else {
+                jefeAreaNombre = entrega.getJefeArea().getNombreUsuario();
+            }
+        }
 
-        return entregaEppRepository.findByTrabajador(trabajadorId, pageable)
-                .map(entrega -> {
-                    List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entrega);
-                    return mapToResponseDTO(entrega, detalles);
-                });
-    }
-
-    /**
-     * Mapea a DTO de respuesta básica.
-     */
-    private EntregaEppResponseDTO mapToResponseDTO(EntregaEpp entrega, List<DetalleEntregaEpp> detalles) {
         return EntregaEppResponseDTO.builder()
                 .entregaId(entrega.getEntregaId())
-                .trabajadorId(entrega.getTrabajador().getTrabajadorId())
-                .trabajadorNombre(entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos())
-                .trabajadorDni(entrega.getTrabajador().getDni())
-                .jefeAreaId(entrega.getJefeArea().getTrabajadorId())
-                .jefeAreaNombre(entrega.getJefeArea().getNombres() + " " + entrega.getJefeArea().getApellidos())
                 .fechaEntrega(entrega.getFechaEntrega())
+                .jefeAreaNombre(jefeAreaNombre)
+                .trabajadorNombre(entrega.getTrabajador() != null ? entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos() : null)
                 .tipoEntrega(entrega.getTipoEntrega())
-                .observaciones(entrega.getObservaciones())
                 .status(entrega.getStatus())
-                .items(detalles.stream().map(this::mapDetalleToDTO).collect(Collectors.toList()))
+                .observaciones(entrega.getObservaciones())
+                .detalles(detallesDTO)
                 .build();
     }
 
     /**
-     * Mapea a DTO de respuesta detallada.
+     * Helper para convertir un EPP CONSUMIBLE (agrupado) a un DetalleEntregaDTO.
      */
-    private EntregaDetalleResponseDTO mapToDetalleResponseDTO(EntregaEpp entrega, List<DetalleEntregaEpp> detalles) {
-        return EntregaDetalleResponseDTO.builder()
-                .entregaId(entrega.getEntregaId())
-                .trabajadorId(entrega.getTrabajador().getTrabajadorId())
-                .trabajadorNombre(entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos())
-                .trabajadorDni(entrega.getTrabajador().getDni())
-                .trabajadorArea(entrega.getTrabajador().getArea().getNombreArea())
-                .trabajadorPuesto(entrega.getTrabajador().getCargo())
-                .jefeAreaId(entrega.getJefeArea().getTrabajadorId())
-                .jefeAreaNombre(entrega.getJefeArea().getNombres() + " " + entrega.getJefeArea().getApellidos())
-                .fechaEntrega(entrega.getFechaEntrega())
-                .tipoEntrega(entrega.getTipoEntrega())
-                .observaciones(entrega.getObservaciones())
-                .status(entrega.getStatus())
-                .items(detalles.stream().map(this::mapDetalleToDTO).collect(Collectors.toList()))
-                .totalItems(detalles.size())
-                .build();
-    }
-
-    /**
-     * Mapea detalle a DTO.
-     */
-    private DetalleEntregaDTO mapDetalleToDTO(DetalleEntregaEpp detalle) {
+    private DetalleEntregaDTO convertirDetalleConsumibleADetalleDTO(DetalleEntregaEpp detalle) {
+        CatalogoEpp epp = detalle.getEpp();
         return DetalleEntregaDTO.builder()
                 .detalleId(detalle.getDetalleId())
-                .eppId(detalle.getEpp().getEppId())
-                .eppNombre(detalle.getEpp().getNombreEpp())
-                .eppMarca(detalle.getEpp().getMarca())              // ← NUEVO
-                .eppUnidadMedida(detalle.getEpp().getUnidadMedida())// ← NUEVO
-                .tipoUso(detalle.getEpp().getTipoUso())
+                .eppId(epp.getEppId())
+                .eppNombre(epp.getNombreEpp())
+                .tipoUso(epp.getTipoUso())
                 .cantidad(detalle.getCantidad())
-                .instanciaEppId(detalle.getInstanciaEpp() != null ? detalle.getInstanciaEpp().getInstanciaEppId() : null)
-                .codigoSerie(detalle.getInstanciaEpp() != null ? detalle.getInstanciaEpp().getCodigoSerie() : null)
+                .instanciaEppId(null)
+                .eppCodigoSerie(null)
                 .motivo(detalle.getMotivo())
+                .eppMarca(epp.getMarca())
+                .eppUnidadMedida(epp.getUnidadMedida())
+                .build();
+    }
+
+    /**
+     * Helper para convertir un EPP DURADERO (instancia individual) a un DetalleEntregaDTO.
+     */
+    private DetalleEntregaDTO convertirInstanciaADetalleDTO(InstanciaEpp instancia) {
+        CatalogoEpp epp = instancia.getEpp();
+        DetalleEntregaEpp detalle = instancia.getDetalleEntrega();
+
+        return DetalleEntregaDTO.builder()
+                .detalleId(detalle != null ? detalle.getDetalleId() : null)
+                .eppId(epp.getEppId())
+                .eppNombre(epp.getNombreEpp())
+                .tipoUso(epp.getTipoUso())
+                .cantidad(1)
+                .instanciaEppId(instancia.getInstanciaEppId())
+                .eppCodigoSerie(instancia.getCodigoSerie())
+                .motivo(detalle != null ? detalle.getMotivo() : null)
+                .eppMarca(epp.getMarca())
+                .eppUnidadMedida(epp.getUnidadMedida())
                 .build();
     }
 }

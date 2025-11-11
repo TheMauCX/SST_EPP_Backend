@@ -18,9 +18,9 @@ public class DetalleEntregaDTO {
     private CatalogoEpp.TipoUso tipoUso;
     private Integer cantidad; // Para CONSUMIBLES
     private Integer instanciaEppId; // Para DURADEROS
-    private String codigoSerie; // Para DURADEROS
+    private String eppCodigoSerie; // Para DURADEROS
     private String motivo;
 
-    private String eppMarca;           // ← NUEVO
-    private String eppUnidadMedida;    // ← NUEVO
+    private String eppMarca;
+    private String eppUnidadMedida;
 }

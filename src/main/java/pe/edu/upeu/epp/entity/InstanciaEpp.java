@@ -11,7 +11,9 @@ import java.time.LocalDateTime;
         @Index(name = "idx_instancia_epp_codigo", columnList = "codigo_serie"),
         @Index(name = "idx_instancia_epp_estado", columnList = "estado_id"),
         @Index(name = "idx_instancia_epp_trabajador", columnList = "trabajador_actual_id"),
-        @Index(name = "idx_instancia_proxima_inspeccion", columnList = "fecha_proxima_inspeccion")
+        @Index(name = "idx_instancia_proxima_inspeccion", columnList = "fecha_proxima_inspeccion"),
+        // Nuevo índice para la trazabilidad
+        @Index(name = "idx_instancia_detalle_entrega", columnList = "detalle_entrega_id")
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class InstanciaEpp {
@@ -24,6 +26,16 @@ public class InstanciaEpp {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "epp_id", nullable = false)
     private CatalogoEpp epp;
+
+    // --- ESTE ES EL NUEVO CAMPO PARA TRAZABILIDAD ---
+    /**
+     * Vincula esta instancia física con el detalle de la entrega que la creó.
+     * Permite saber en qué fecha y en qué "lote" se entregó este EPP.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "detalle_entrega_id")
+    private DetalleEntregaEpp detalleEntrega;
+    // --- FIN DEL NUEVO CAMPO ---
 
     @NotNull
     @Column(name = "codigo_serie", unique = true, nullable = false, length = 50)
