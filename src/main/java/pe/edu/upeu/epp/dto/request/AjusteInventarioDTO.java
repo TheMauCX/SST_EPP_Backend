@@ -25,7 +25,4 @@ public class AjusteInventarioDTO {
     @NotBlank(message = "El tipo de ajuste es obligatorio")
     @Pattern(regexp = "INGRESO|SALIDA", message = "El tipo de ajuste debe ser 'INGRESO' o 'SALIDA'")
     private String tipoAjuste;
-
-    @NotNull(message = "El ID del usuario responsable es obligatorio")
-    private Integer usuarioResponsableId;
 }
