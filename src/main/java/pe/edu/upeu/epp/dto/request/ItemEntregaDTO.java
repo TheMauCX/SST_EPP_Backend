@@ -25,6 +25,9 @@ public class ItemEntregaDTO {
     // Para EPPs DURADEROS: instanciaEppId es obligatoria, cantidad es null
     private Integer instanciaEppId;
 
+    @NotBlank(message = "El 'estadoNombre' (ej. 'NUEVO') no puede estar vacío para un ítem.")
+    private String estadoNombre;
+
     @NotBlank(message = "El motivo es obligatorio")
     @Size(max = 50, message = "El motivo no puede exceder 50 caracteres")
     private String motivo; // PRIMERA_ENTREGA, REPOSICION, DESGASTE, etc.

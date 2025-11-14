@@ -323,6 +323,22 @@ INSERT INTO epp.auditoria (tabla_afectada, registro_id, usuario_id, ip_origen, u
                                                                                                                                                            ('usuario', 1, 1, '192.168.1.100', 'Mozilla/5.0', NULL, '{"nombre_usuario": "admin"}', 'UPDATE', '2025-10-22 18:00:00')
 ON CONFLICT DO NOTHING;
 
+-- AÑADIR ESTO AL FINAL DE TU ARCHIVO init.sql
+
+\echo '--- Actualizando secuencias de IDs ---'
+SELECT setval(pg_get_serial_sequence('epp.area', 'area_id'), COALESCE((SELECT MAX(area_id) FROM epp.area), 1));
+SELECT setval(pg_get_serial_sequence('epp.catalogo_epp', 'epp_id'), COALESCE((SELECT MAX(epp_id) FROM epp.catalogo_epp), 1));
+SELECT setval(pg_get_serial_sequence('epp.trabajador', 'trabajador_id'), COALESCE((SELECT MAX(trabajador_id) FROM epp.trabajador), 1));
+SELECT setval(pg_get_serial_sequence('epp.usuario', 'usuario_id'), COALESCE((SELECT MAX(usuario_id) FROM epp.usuario), 1));
+SELECT setval(pg_get_serial_sequence('epp.entrega_epp', 'entrega_id'), COALESCE((SELECT MAX(entrega_id) FROM epp.entrega_epp), 1));
+SELECT setval(pg_get_serial_sequence('epp.detalle_entrega_epp', 'detalle_id'), COALESCE((SELECT MAX(detalle_id) FROM epp.detalle_entrega_epp), 1));
+SELECT setval(pg_get_serial_sequence('epp.instancia_epp', 'instancia_epp_id'), COALESCE((SELECT MAX(instancia_epp_id) FROM epp.instancia_epp), 1));
+SELECT setval(pg_get_serial_sequence('epp.inspeccion', 'inspeccion_id'), COALESCE((SELECT MAX(inspeccion_id) FROM epp.inspeccion), 1));
+SELECT setval(pg_get_serial_sequence('epp.estado_epp', 'estado_id'), COALESCE((SELECT MAX(estado_id) FROM epp.estado_epp), 1));
+SELECT setval(pg_get_serial_sequence('epp.inventario_area', 'inventario_area_id'), COALESCE((SELECT MAX(inventario_area_id) FROM epp.inventario_area), 1));
+-- (y así para todas las tablas con 'serial' e inserts manuales)
+\echo '--- Secuencias actualizadas ---'
+
 -- ===================================================================
 -- FIN DEL SCRIPT DE DATOS SINTÉTICOS
 -- ===================================================================

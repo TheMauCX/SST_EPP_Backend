@@ -40,7 +40,7 @@ public class EntregaEppController {
      * CRÍTICO: Transacción atómica que actualiza inventarios.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','JEFE_AREA', 'SUPERVISOR_SST')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'JEFE_AREA', 'SUPERVISOR_SST')")
     @Operation(
             summary = "Registrar entrega de EPP",
             description = "Registra la entrega de uno o más EPPs a un trabajador. " +
@@ -74,7 +74,7 @@ public class EntregaEppController {
      * Listar todas las entregas con paginación.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','JEFE_AREA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'JEFE_AREA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
     @Operation(summary = "Listar todas las entregas (Paginado)",
             description = "Retorna una lista paginada de todas las entregas")
     public ResponseEntity<Page<EntregaEppResponseDTO>> listarTodas(
