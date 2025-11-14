@@ -139,7 +139,7 @@ public class SecurityConfig {
 
         ));
 // Métodos HTTP permitidos
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "PATCH", "POST", "PUT", "DELETE", "OPTIONS"));
 // Headers permitidos
         configuration.setAllowedHeaders(List.of("*"));
 // Permitir credenciales (cookies, headers de autorización)
