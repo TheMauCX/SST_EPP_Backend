@@ -35,24 +35,19 @@ public class CatalogoEppService {
     public CatalogoEppResponseDTO crear(CatalogoEppRequestDTO request) {
         log.info("Creando nuevo EPP: {}", request.getNombreEpp());
 
-        // Validar que el código de identificación sea único
-        if (request.getCodigoIdentificacion() != null &&
-                catalogoEppRepository.findByCodigoIdentificacion(request.getCodigoIdentificacion()).isPresent()) {
-            throw new BusinessException("Ya existe un EPP con el código de identificación: " +
-                    request.getCodigoIdentificacion());
-        }
-
         // Crear entidad
         CatalogoEpp catalogoEpp = CatalogoEpp.builder()
                 .nombreEpp(request.getNombreEpp())
-                .codigoIdentificacion(request.getCodigoIdentificacion())
-                .especificacionesTecnicas(request.getEspecificacionesTecnicas())
                 .tipoUso(request.getTipoUso())
-                .vidaUtilMeses(request.getVidaUtilMeses())
-                .nivelProteccion(request.getNivelProteccion())
-                .marca(request.getMarca())
-                .unidadMedida(request.getUnidadMedida())
-                .tallas(request.getTallas())
+                .aprobacionesNormas(request.getAprobacionesNormas())
+                .caracteristicas(request.getCaracteristicas())
+                .fabricante(request.getFabricante())
+                .tiempoUsoFabricante(request.getTiempoUsoFabricante())
+                .tiempoUsoOperacion(request.getTiempoUsoOperacion())
+                .condicionesMantenimiento(request.getCondicionesMantenimiento())
+                .condicionesAlmacenamiento(request.getCondicionesAlmacenamiento())
+                .condicionesCambioPrematuro(request.getCondicionesCambioPrematuro())
+                .fotoReferencia(request.getFotoReferencia())
                 .activo(true)
                 .build();
 
@@ -99,6 +94,17 @@ public class CatalogoEppService {
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> buscarPorFabricante(String fabricante) {
+        return catalogoEppRepository.findByFabricante(fabricante).stream()
+                .map(this::mapToResponseDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> buscarPorNorma(String norma) {
+        return catalogoEppRepository.buscarPorNorma(norma).stream()
+                .map(this::mapToResponseDTO).collect(Collectors.toList());
+    }
 
     /**
      * Buscar EPPs por nombre (búsqueda parcial).
@@ -140,30 +146,38 @@ public class CatalogoEppService {
         if (request.getNombreEpp() != null) {
             catalogoEpp.setNombreEpp(request.getNombreEpp());
         }
-        if (request.getEspecificacionesTecnicas() != null) {
-            catalogoEpp.setEspecificacionesTecnicas(request.getEspecificacionesTecnicas());
-        }
         if (request.getTipoUso() != null) {
             catalogoEpp.setTipoUso(request.getTipoUso());
         }
-        if (request.getVidaUtilMeses() != null) {
-            catalogoEpp.setVidaUtilMeses(request.getVidaUtilMeses());
+        if (request.getAprobacionesNormas() != null) {
+            catalogoEpp.setAprobacionesNormas(request.getAprobacionesNormas());
         }
-        if (request.getNivelProteccion() != null) {
-            catalogoEpp.setNivelProteccion(request.getNivelProteccion());
+        if (request.getCaracteristicas() != null) {
+            catalogoEpp.setCaracteristicas(request.getCaracteristicas());
+        }
+        if (request.getFabricante() != null) {
+            catalogoEpp.setFabricante(request.getFabricante());
+        }
+        if (request.getTiempoUsoFabricante() != null) {
+            catalogoEpp.setTiempoUsoFabricante(request.getTiempoUsoFabricante());
+        }
+        if (request.getTiempoUsoOperacion() != null) {
+            catalogoEpp.setTiempoUsoOperacion(request.getTiempoUsoOperacion());
+        }
+        if (request.getCondicionesMantenimiento() != null) {
+            catalogoEpp.setCondicionesMantenimiento(request.getCondicionesMantenimiento());
+        }
+        if (request.getCondicionesAlmacenamiento() != null) {
+            catalogoEpp.setCondicionesAlmacenamiento(request.getCondicionesAlmacenamiento());
+        }
+        if (request.getCondicionesCambioPrematuro() != null) {
+            catalogoEpp.setCondicionesCambioPrematuro(request.getCondicionesCambioPrematuro());
+        }
+        if (request.getFotoReferencia() != null) {
+            catalogoEpp.setFotoReferencia(request.getFotoReferencia());
         }
         if (request.getActivo() != null) {
             catalogoEpp.setActivo(request.getActivo());
-        }
-        if (request.getMarca() != null) {
-            catalogoEpp.setMarca(request.getMarca());
-        }
-        if (request.getUnidadMedida() != null) {
-            catalogoEpp.setUnidadMedida(request.getUnidadMedida());
-        }
-
-        if (request.getTallas() != null) { // LÍNEA AÑADIDA
-            catalogoEpp.setTallas(request.getTallas()); // LÍNEA AÑADIDA
         }
 
         catalogoEpp = catalogoEppRepository.save(catalogoEpp);
@@ -183,8 +197,7 @@ public class CatalogoEppService {
         CatalogoEpp catalogoEpp = catalogoEppRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + id));
 
-        // Verificar que no tenga inventario activo (opcional, comentado por ahora)
-        // TODO: Implementar verificación de inventario antes de eliminar
+        // TODO: Implementar verificación de inventario antes de eliminar (Validar en InventarioCentralRepository si hay stock)
 
         catalogoEpp.setActivo(false);
         catalogoEppRepository.save(catalogoEpp);
@@ -199,15 +212,17 @@ public class CatalogoEppService {
         return CatalogoEppResponseDTO.builder()
                 .eppId(catalogoEpp.getEppId())
                 .nombreEpp(catalogoEpp.getNombreEpp())
-                .codigoIdentificacion(catalogoEpp.getCodigoIdentificacion())
-                .especificacionesTecnicas(catalogoEpp.getEspecificacionesTecnicas())
                 .tipoUso(catalogoEpp.getTipoUso())
-                .vidaUtilMeses(catalogoEpp.getVidaUtilMeses())
-                .nivelProteccion(catalogoEpp.getNivelProteccion())
+                .aprobacionesNormas(catalogoEpp.getAprobacionesNormas())
+                .caracteristicas(catalogoEpp.getCaracteristicas())
+                .fabricante(catalogoEpp.getFabricante())
+                .tiempoUsoFabricante(catalogoEpp.getTiempoUsoFabricante())
+                .tiempoUsoOperacion(catalogoEpp.getTiempoUsoOperacion())
+                .condicionesMantenimiento(catalogoEpp.getCondicionesMantenimiento())
+                .condicionesAlmacenamiento(catalogoEpp.getCondicionesAlmacenamiento())
+                .condicionesCambioPrematuro(catalogoEpp.getCondicionesCambioPrematuro())
+                .fotoReferencia(catalogoEpp.getFotoReferencia())
                 .activo(catalogoEpp.getActivo())
-                .marca(catalogoEpp.getMarca())
-                .unidadMedida(catalogoEpp.getUnidadMedida())
-                .tallas(catalogoEpp.getTallas())
                 .fechaCreacion(catalogoEpp.getFechaCreacion())
                 .fechaActualizacion(catalogoEpp.getFechaActualizacion())
                 .build();

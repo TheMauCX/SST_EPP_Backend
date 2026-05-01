@@ -23,47 +23,32 @@ import pe.edu.upeu.epp.service.CatalogoEppService;
 import java.util.List;
 
 /**
- * Controller REST para gestión del Catálogo de EPP.
- * Expone endpoints CRUD para administración de tipos de EPP.
+ * Controller REST para gestión del Catálogo de EPP (Ficha Técnica).
  */
 @RestController
 @RequestMapping("/api/v1/catalogo-epp")
 @RequiredArgsConstructor
-@Tag(name = "Catálogo EPP", description = "Gestión del catálogo de Equipos de Protección Personal")
+@Tag(name = "Catálogo EPP", description = "Gestión del catálogo y fichas técnicas de Equipos de Protección Personal")
 @SecurityRequirement(name = "Bearer Authentication")
 public class CatalogoEppController {
 
     private final CatalogoEppService catalogoEppService;
 
-    /**
-     * Crear un nuevo EPP en el catálogo.
-     * Solo accesible por ADMINISTRADOR_SISTEMA.
-     */
     @PostMapping
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
     @Operation(summary = "Crear nuevo EPP", description = "Crea un nuevo tipo de EPP en el catálogo")
-    public ResponseEntity<CatalogoEppResponseDTO> crear(
-            @Valid @RequestBody CatalogoEppRequestDTO request) {
+    public ResponseEntity<CatalogoEppResponseDTO> crear(@Valid @RequestBody CatalogoEppRequestDTO request) {
         CatalogoEppResponseDTO response = catalogoEppService.crear(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /**
-     * Obtener un EPP por ID.
-     * Accesible por todos los roles autenticados.
-     */
     @GetMapping("/{id}")
     @Operation(summary = "Obtener EPP por ID", description = "Retorna los detalles de un EPP específico")
-    public ResponseEntity<CatalogoEppResponseDTO> obtenerPorId(
-            @Parameter(description = "ID del EPP") @PathVariable Integer id) {
+    public ResponseEntity<CatalogoEppResponseDTO> obtenerPorId(@Parameter(description = "ID del EPP") @PathVariable Integer id) {
         CatalogoEppResponseDTO response = catalogoEppService.obtenerPorId(id);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Listar todos los EPPs con paginación.
-     * Accesible por todos los roles autenticados.
-     */
     @GetMapping
     @Operation(summary = "Listar todos los EPPs", description = "Retorna una lista paginada de todos los EPPs")
     public ResponseEntity<Page<CatalogoEppResponseDTO>> listarTodos(
@@ -72,10 +57,6 @@ public class CatalogoEppController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Listar solo EPPs activos.
-     * Accesible por todos los roles autenticados.
-     */
     @GetMapping("/activos")
     @Operation(summary = "Listar EPPs activos", description = "Retorna solo los EPPs que están activos")
     public ResponseEntity<List<CatalogoEppResponseDTO>> listarActivos() {
@@ -83,55 +64,47 @@ public class CatalogoEppController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Buscar EPPs por nombre.
-     * Accesible por todos los roles autenticados.
-     */
     @GetMapping("/buscar")
     @Operation(summary = "Buscar EPPs por nombre", description = "Busca EPPs cuyo nombre contenga el texto especificado")
-    public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorNombre(
-            @Parameter(description = "Texto a buscar en el nombre")
-            @RequestParam String nombre) {
+    public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorNombre(@RequestParam String nombre) {
         List<CatalogoEppResponseDTO> response = catalogoEppService.buscarPorNombre(nombre);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Listar EPPs por tipo de uso.
-     * Accesible por todos los roles autenticados.
-     */
+    @GetMapping("/fabricante")
+    @Operation(summary = "Buscar EPPs por Fabricante", description = "Busca EPPs pertenecientes a un fabricante específico")
+    public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorFabricante(@RequestParam String fabricante) {
+        List<CatalogoEppResponseDTO> response = catalogoEppService.buscarPorFabricante(fabricante);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/norma")
+    @Operation(summary = "Buscar EPPs por Norma", description = "Busca EPPs que cumplan con cierta norma o aprobación (ej. ANSI)")
+    public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorNorma(@RequestParam String norma) {
+        List<CatalogoEppResponseDTO> response = catalogoEppService.buscarPorNorma(norma);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/tipo/{tipoUso}")
     @Operation(summary = "Listar EPPs por tipo", description = "Retorna EPPs filtrados por tipo de uso (CONSUMIBLE o DURADERO)")
-    public ResponseEntity<List<CatalogoEppResponseDTO>> listarPorTipo(
-            @Parameter(description = "Tipo de uso: CONSUMIBLE o DURADERO")
-            @PathVariable CatalogoEpp.TipoUso tipoUso) {
+    public ResponseEntity<List<CatalogoEppResponseDTO>> listarPorTipo(@PathVariable CatalogoEpp.TipoUso tipoUso) {
         List<CatalogoEppResponseDTO> response = catalogoEppService.listarPorTipo(tipoUso);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Actualizar un EPP existente.
-     * Solo accesible por ADMINISTRADOR_SISTEMA.
-     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Actualizar EPP", description = "Actualiza la información de un EPP existente")
+    @Operation(summary = "Actualizar EPP", description = "Actualiza la información (Ficha Técnica) de un EPP existente")
     public ResponseEntity<CatalogoEppResponseDTO> actualizar(
-            @Parameter(description = "ID del EPP") @PathVariable Integer id,
-            @Valid @RequestBody CatalogoEppUpdateDTO request) {
+            @PathVariable Integer id, @Valid @RequestBody CatalogoEppUpdateDTO request) {
         CatalogoEppResponseDTO response = catalogoEppService.actualizar(id, request);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Eliminar (desactivar) un EPP.
-     * Solo accesible por ADMINISTRADOR_SISTEMA.
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
     @Operation(summary = "Eliminar EPP", description = "Desactiva un EPP (no lo elimina físicamente)")
-    public ResponseEntity<Void> eliminar(
-            @Parameter(description = "ID del EPP") @PathVariable Integer id) {
+    public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         catalogoEppService.eliminar(id);
         return ResponseEntity.noContent().build();
     }

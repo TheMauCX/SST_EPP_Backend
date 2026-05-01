@@ -16,15 +16,21 @@ public class CatalogoEppResponseDTO {
 
     private Integer eppId;
     private String nombreEpp;
-    private String codigoIdentificacion;
-    private String especificacionesTecnicas;
     private TipoUso tipoUso;
-    private Integer vidaUtilMeses;
-    private String nivelProteccion;
+
+    // --- Campos de Ficha Técnica ---
+    private String aprobacionesNormas;
+    private String caracteristicas;
+    private String fabricante;
+    private String tiempoUsoFabricante;
+    private String tiempoUsoOperacion;
+    private String condicionesMantenimiento;
+    private String condicionesAlmacenamiento;
+    private String condicionesCambioPrematuro;
+    private String fotoReferencia;
+
+    // --- Campos de Auditoría y Estado ---
     private Boolean activo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
-    private String marca;
-    private String unidadMedida;
-    private String tallas;
 }

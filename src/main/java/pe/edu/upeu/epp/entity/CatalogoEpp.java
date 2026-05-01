@@ -28,18 +28,48 @@ public class CatalogoEpp {
     @Column(name = "nombre_epp", nullable = false, length = 100)
     private String nombreEpp;
 
-    @Column(name = "codigo_identificacion", unique = true, length = 50)
-    private String codigoIdentificacion;
+//    @Column(name = "codigo_identificacion", unique = true, length = 50)
+//    private String codigoIdentificacion;
+//
+//    @Column(name = "especificaciones_tecnicas", columnDefinition = "TEXT")
+//    private String especificacionesTecnicas;
 
-    @Column(name = "especificaciones_tecnicas", columnDefinition = "TEXT")
-    private String especificacionesTecnicas;
+//    @Column(name = "vida_util_meses")
+//    private Integer vidaUtilMeses;
 
-    @Column(name = "vida_util_meses")
-    private Integer vidaUtilMeses;
+//    @Column(name = "nivel_proteccion", length = 50)
+//    private String nivelProteccion;
 
-    @Column(name = "nivel_proteccion", length = 50)
-    private String nivelProteccion;
+    // --- NUEVOS CAMPOS: Ficha Técnica ---
 
+    @Column(name = "aprobaciones_normas", length = 255)
+    private String aprobacionesNormas;
+
+    @Column(columnDefinition = "TEXT")
+    private String caracteristicas;
+
+    @Column(length = 100)
+    private String fabricante;
+
+    @Column(name = "tiempo_uso_fabricante", length = 150)
+    private String tiempoUsoFabricante;
+
+    @Column(name = "tiempo_uso_operacion", length = 150)
+    private String tiempoUsoOperacion;
+
+    @Column(name = "condiciones_mantenimiento", columnDefinition = "TEXT")
+    private String condicionesMantenimiento;
+
+    @Column(name = "condiciones_almacenamiento", columnDefinition = "TEXT")
+    private String condicionesAlmacenamiento;
+
+    @Column(name = "condiciones_cambio_prematuro", columnDefinition = "TEXT")
+    private String condicionesCambioPrematuro;
+
+    @Column(name = "foto_referencia", length = 500)
+    private String fotoReferencia;
+
+    // --- Auditoría ---
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
@@ -49,14 +79,14 @@ public class CatalogoEpp {
     @Column(name = "activo")
     private Boolean activo = true;
 
-    @Column(name = "tallas", length = 100)
-    private String tallas;
+//    @Column(name = "tallas", length = 100)
+//    private String tallas;
+//
+//    @Column(name = "marca", length = 100)
+//    private String marca;
 
-    @Column(name = "marca", length = 100)
-    private String marca;
-
-    @Column(name = "unidad_medida", length = 20)
-    private String unidadMedida;
+//    @Column(name = "unidad_medida", length = 20)
+//    private String unidadMedida;
 
     @NotNull
     @Enumerated(EnumType.STRING)

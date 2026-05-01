@@ -17,30 +17,31 @@ public class CatalogoEppRequestDTO {
     @Size(max = 100, message = "El nombre no puede exceder 100 caracteres")
     private String nombreEpp;
 
-    @Size(max = 50, message = "El código de identificación no puede exceder 50 caracteres")
-    private String codigoIdentificacion;
-
-    @Size(max = 1000, message = "Las especificaciones técnicas no pueden exceder 1000 caracteres")
-    private String especificacionesTecnicas;
-
     @NotNull(message = "El tipo de uso es obligatorio")
     private TipoUso tipoUso;
 
-    @Min(value = 1, message = "La vida útil debe ser al menos 1 mes")
-    @Max(value = 120, message = "La vida útil no puede exceder 120 meses")
-    private Integer vidaUtilMeses;
+    // --- Campos de Ficha Técnica ---
 
-    @Size(max = 50, message = "El nivel de protección no puede exceder 50 caracteres")
-    private String nivelProteccion;
+    @Size(max = 255, message = "Las aprobaciones o normas no pueden exceder 255 caracteres")
+    private String aprobacionesNormas;
 
-    @Size(max = 100, message = "La marca no puede exceder 100 caracteres")
-    private String marca;
+    private String caracteristicas;
 
-    @Size(max = 100, message = "Las tallas no pueden exceder 100 caracteres")
-    private String tallas;
+    @Size(max = 100, message = "El fabricante no puede exceder 100 caracteres")
+    private String fabricante;
 
-    @Size(max = 20, message = "La unidad de medida no puede exceder 20 caracteres")
-    @Pattern(regexp = "^(UNI|PAR|CAJA|SET|KIT|ROLLO|PAQUETE|METRO|LITRO)?$",
-            message = "Unidad de medida inválida")
-    private String unidadMedida;
+    @Size(max = 150, message = "El tiempo de uso por fabricante no puede exceder 150 caracteres")
+    private String tiempoUsoFabricante;
+
+    @Size(max = 150, message = "El tiempo de uso por operación no puede exceder 150 caracteres")
+    private String tiempoUsoOperacion;
+
+    private String condicionesMantenimiento;
+
+    private String condicionesAlmacenamiento;
+
+    private String condicionesCambioPrematuro;
+
+    @Size(max = 500, message = "La URL de la foto de referencia no puede exceder 500 caracteres")
+    private String fotoReferencia;
 }

@@ -25,12 +25,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * Servicio para gestión de Inventario Central con lógica de merge.
- *
- * @author Sistema EPP
- * @version 2.0 - Corregido para usar inventarioCentralId
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -40,9 +34,6 @@ public class InventarioCentralService {
     private final CatalogoEppRepository catalogoEppRepository;
     private final EstadoEppRepository estadoEppRepository;
 
-    /**
-     * Crea un nuevo registro de inventario central.
-     */
     @Transactional
     public InventarioCentralResponseDTO crear(InventarioCentralRequestDTO request) {
         log.info("Creando inventario central - EPP ID: {}, Lote: {}, Estado ID: {}",
@@ -84,9 +75,6 @@ public class InventarioCentralService {
         return mapToResponseDTO(guardado);
     }
 
-    /**
-     * Actualiza un inventario existente con lógica de MERGE.
-     */
     @Transactional
     public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
         log.info("Actualizando inventario central ID: {}", id);
@@ -146,14 +134,9 @@ public class InventarioCentralService {
                 InventarioCentral consolidado = inventarioCentralRepository.save(destino);
                 inventarioCentralRepository.delete(inventarioActual);
 
-                log.info("MERGE completado. Registro {} eliminado. Nuevo total en {}: {}",
-                        id, consolidado.getInventarioCentralId(), consolidado.getCantidadActual());
-
                 return mapToResponseDTO(consolidado);
             }
         }
-
-        log.info("No hay conflictos. Actualizando normalmente...");
 
         if (request.getEstadoId() != null) {
             inventarioActual.setEstado(nuevoEstado);
@@ -175,31 +158,23 @@ public class InventarioCentralService {
         }
 
         InventarioCentral actualizado = inventarioCentralRepository.save(inventarioActual);
-        log.info("Inventario actualizado. ID: {}", actualizado.getInventarioCentralId());
-
         return mapToResponseDTO(actualizado);
     }
 
     @Transactional(readOnly = true)
     public InventarioCentralResponseDTO obtenerPorId(Integer id) {
-        log.info("Obteniendo inventario central ID: {}", id);
-
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
-
         return mapToResponseDTO(inventario);
     }
 
     @Transactional(readOnly = true)
     public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable) {
-        log.info("Listando inventarios centrales");
         return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarPorEpp(Integer eppId) {
-        log.info("Listando inventarios del EPP ID: {}", eppId);
-
         CatalogoEpp epp = catalogoEppRepository.findById(eppId)
                 .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + eppId));
 
@@ -210,7 +185,6 @@ public class InventarioCentralService {
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarStockBajo() {
-        log.info("Obteniendo alertas de stock bajo");
         return inventarioCentralRepository.findStockBajo().stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
@@ -218,7 +192,6 @@ public class InventarioCentralService {
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarProximosAVencer() {
-        log.info("Obteniendo alertas de próximos a vencer");
         LocalDate fechaLimite = LocalDate.now().plusDays(30);
         return inventarioCentralRepository.findByFechaVencimientoBefore(fechaLimite).stream()
                 .map(this::mapToResponseDTO)
@@ -227,8 +200,6 @@ public class InventarioCentralService {
 
     @Transactional
     public InventarioCentralResponseDTO ajustarStock(Integer id, AjusteInventarioDTO request) {
-        log.info("Ajustando stock ID: {}", id);
-
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
@@ -246,27 +217,19 @@ public class InventarioCentralService {
         }
 
         inventario.setCantidadActual(nuevaCantidad);
-
-        String observacionAjuste = String.format(
-                "[AJUSTE %s] %d unidades. Motivo: %s",
-                request.getTipoAjuste(), Math.abs(ajuste), request.getMotivo()
-        );
-        inventario.setObservaciones(observacionAjuste);
+        inventario.setObservaciones(String.format("[AJUSTE %s] %d unidades. Motivo: %s", request.getTipoAjuste(), Math.abs(ajuste), request.getMotivo()));
 
         return mapToResponseDTO(inventarioCentralRepository.save(inventario));
     }
 
     @Transactional
     public void eliminar(Integer id) {
-        log.info("Eliminando inventario ID: {}", id);
-
         InventarioCentral inventario = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
 
         if (inventario.getCantidadActual() > 0) {
             throw new BusinessException("No se puede eliminar inventario con stock disponible");
         }
-
         inventarioCentralRepository.delete(inventario);
     }
 
@@ -275,7 +238,7 @@ public class InventarioCentralService {
                 .inventarioId(inventario.getInventarioCentralId())
                 .eppId(inventario.getEpp().getEppId())
                 .eppNombre(inventario.getEpp().getNombreEpp())
-                .eppCodigoIdentificacion(inventario.getEpp().getCodigoIdentificacion())
+                .eppCodigoIdentificacion(null) // Campo eliminado de CatalogoEpp
                 .tipoUso(inventario.getEpp().getTipoUso())
                 .estadoId(inventario.getEstado().getEstadoId())
                 .estadoNombre(inventario.getEstado().getNombre())

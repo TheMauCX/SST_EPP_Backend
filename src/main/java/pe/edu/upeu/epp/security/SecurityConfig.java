@@ -135,7 +135,7 @@ public class SecurityConfig {
                 "https://app.upeu.edu.pe",
                 "http://localhost:5000",
                 "http://10.0.2.2:8080",
-                "http://10.125.67.149:8080"
+                "http://172.17.25.28:8080"
 
         ));
 // Métodos HTTP permitidos
