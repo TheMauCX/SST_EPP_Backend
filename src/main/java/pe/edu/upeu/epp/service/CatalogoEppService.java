@@ -74,13 +74,15 @@ public class CatalogoEppService {
      * Listar todos los EPPs con paginación.
      */
     @Transactional(readOnly = true)
-    public Page<CatalogoEppResponseDTO> listarTodos(Pageable pageable) {
-        log.debug("Listando todos los EPPs - Página: {}, Tamaño: {}",
-                pageable.getPageNumber(), pageable.getPageSize());
+    public List<CatalogoEppResponseDTO> listarTodos() {
+        log.debug("Listando todos los EPPs");
 
-        return catalogoEppRepository.findAll(pageable)
-                .map(this::mapToResponseDTO);
+        return catalogoEppRepository.findAll()
+                .stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
+
 
     /**
      * Listar solo EPPs activos.

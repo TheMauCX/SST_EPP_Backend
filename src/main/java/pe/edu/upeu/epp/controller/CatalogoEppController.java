@@ -50,10 +50,9 @@ public class CatalogoEppController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar todos los EPPs", description = "Retorna una lista paginada de todos los EPPs")
-    public ResponseEntity<Page<CatalogoEppResponseDTO>> listarTodos(
-            @PageableDefault(size = 20, sort = "nombreEpp", direction = Sort.Direction.ASC) Pageable pageable) {
-        Page<CatalogoEppResponseDTO> response = catalogoEppService.listarTodos(pageable);
+    @Operation(summary = "Listar todos los EPPs", description = "Retorna una lista de todos los EPPs")
+    public ResponseEntity<List<CatalogoEppResponseDTO>> listarTodos() {
+        List<CatalogoEppResponseDTO> response = catalogoEppService.listarTodos();
         return ResponseEntity.ok(response);
     }
 
