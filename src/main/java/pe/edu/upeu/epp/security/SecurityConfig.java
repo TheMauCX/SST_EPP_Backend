@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/v1/test-azure/**").permitAll()
 
                         // Endpoints de administración (solo ADMINISTRADOR_SISTEMA)
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMINISTRADOR_SISTEMA")

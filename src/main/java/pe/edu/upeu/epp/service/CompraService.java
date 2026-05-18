@@ -25,7 +25,7 @@ public class CompraService {
     private final InventarioCentralRepository inventarioCentralRepository;
     private final EstadoEppRepository estadoEppRepository;
     private final UsuarioRepository usuarioRepository;
-    private final FileStorageService fileStorageService;
+    private final AzureStorageService azureStorageService;
 
     // ATENCIÓN: @Transactional garantiza que si falla el archivo o el stock, la compra entera hace Rollback
     @Transactional
@@ -39,7 +39,7 @@ public class CompraService {
         // 2. Guardar el archivo físico de la factura
         String rutaArchivo = null;
         if (archivoFactura != null && !archivoFactura.isEmpty()) {
-            rutaArchivo = fileStorageService.guardarFactura(archivoFactura);
+            rutaArchivo = azureStorageService.subirArchivo(archivoFactura);
         }
 
         // 3. Preparar la entidad Compra (Cabecera)
@@ -49,6 +49,7 @@ public class CompraService {
                 .proveedor(request.getProveedor())
                 .rutaArchivoFactura(rutaArchivo)
                 .usuarioRegistro(usuario)
+                .fechaRegistro(LocalDateTime.now())
                 .build();
 
         // Obtener el estado por defecto para nuevo inventario (Asumiremos que el estado "EN_STOCK" es el ID 1)
@@ -77,8 +78,6 @@ public class CompraService {
 
             compra.addDetalle(detalle);
 
-            // c) Trazabilidad al Inventario Central (MAGIA AQUÍ)
-            // Buscamos si ya existe stock de este EPP, con este Lote (usaremos NroFactura como Lote por defecto) y Estado "EN_STOCK"
             Optional<InventarioCentral> inventarioOpt = inventarioCentralRepository.findByEppAndLoteAndEstado(epp, request.getNroFactura(), estadoEnStock);
 
             if (inventarioOpt.isPresent()) {
@@ -102,17 +101,14 @@ public class CompraService {
                         .proveedor(request.getProveedor())
                         .ubicacionBodega("Almacén General") // Por defecto
                         .fechaAdquisicion(request.getFechaCompra())
-                        // ---- LÍNEAS AÑADIDAS PARA SOLUCIONAR EL ERROR ----
                         .fechaCreacion(LocalDateTime.now())
                         .ultimaActualizacion(LocalDateTime.now())
-                        // --------------------------------------------------
                         .build();
                 inventarioCentralRepository.save(nuevoInv);
                 log.info("Nuevo registro de Inventario Central creado para EPP: {}", epp.getNombreEpp());
             }
         }
 
-        // 5. Asignar el total y guardar la compra (Guardará los detalles automáticamente por el CascadeType.ALL)
         compra.setMontoTotal(totalCompra);
         return compraRepository.save(compra);
     }

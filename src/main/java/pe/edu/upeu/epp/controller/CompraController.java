@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/compras")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Compras", description = "Gestión de compras e ingresos directos a Inventario Central")
 @SecurityRequirement(name = "Bearer Authentication")
 public class CompraController {
@@ -36,26 +38,41 @@ public class CompraController {
             @RequestPart(value = "facturaArchivo", required = false) MultipartFile facturaArchivo,
             Authentication authentication) {
 
+        log.info("====== INICIANDO ENDPOINT DE COMPRAS ======");
+        log.info("JSON Recibido: {}", compraDataJson);
+
+        // DEBUG DEL ARCHIVO
+        if (facturaArchivo == null) {
+            log.warn("⚠️ ALERTA: El parámetro 'facturaArchivo' llegó como NULL. Verifica el nombre de la Key en Postman.");
+        } else if (facturaArchivo.isEmpty()) {
+            log.warn("⚠️ ALERTA: El archivo llegó pero pesa 0 bytes.");
+        } else {
+            log.info("✅ Archivo recibido correctamente. Nombre: {}, Tamaño: {} bytes",
+                    facturaArchivo.getOriginalFilename(), facturaArchivo.getSize());
+        }
+
         try {
-            // Convertir el JSON String a nuestro DTO usando Jackson
             ObjectMapper mapper = new ObjectMapper();
-            mapper.registerModule(new JavaTimeModule()); // Para soportar LocalDate
+            mapper.registerModule(new JavaTimeModule());
             CompraRequestDTO requestDTO = mapper.readValue(compraDataJson, CompraRequestDTO.class);
 
-            // Obtener usuario que hace la petición
             String username = authentication.getName();
+            log.info("Usuario autenticado: {}", username);
 
-            // Llamar al servicio
             Compra compraGuardada = compraService.registrarCompra(requestDTO, facturaArchivo, username);
+
+            log.info("====== COMPRA EXITOSA ID: {} ======", compraGuardada.getCompraId());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     Map.of(
                             "mensaje", "Compra registrada e inventario actualizado exitosamente",
                             "compraId", compraGuardada.getCompraId(),
+                            "urlFactura", compraGuardada.getRutaArchivoFactura() != null ? compraGuardada.getRutaArchivoFactura() : "No se subió archivo",
                             "totalGastado", compraGuardada.getMontoTotal()
                     )
             );
         } catch (Exception e) {
+            log.error("❌ ERROR EN EL CONTROLADOR DE COMPRAS: ", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
     }
