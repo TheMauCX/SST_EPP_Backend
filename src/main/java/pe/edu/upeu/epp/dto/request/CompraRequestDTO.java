@@ -21,7 +21,6 @@ public class CompraRequestDTO {
     @NotBlank(message = "El proveedor es obligatorio")
     private String proveedor;
 
-    // Arreglo de ítems comprados
     @NotEmpty(message = "Debe incluir al menos un EPP en la compra")
     @Valid
     private List<DetalleCompraRequestDTO> items;

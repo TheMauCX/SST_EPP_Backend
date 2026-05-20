@@ -27,22 +27,18 @@ public class CompraService {
     private final UsuarioRepository usuarioRepository;
     private final AzureStorageService azureStorageService;
 
-    // ATENCIÓN: @Transactional garantiza que si falla el archivo o el stock, la compra entera hace Rollback
     @Transactional
     public Compra registrarCompra(CompraRequestDTO request, MultipartFile archivoFactura, String username) {
         log.info("Iniciando registro de compra. Factura: {}", request.getNroFactura());
 
-        // 1. Obtener usuario responsable
         Usuario usuario = usuarioRepository.findByNombreUsuario(username)
                 .orElseThrow(() -> new BusinessException("Usuario no encontrado"));
 
-        // 2. Guardar el archivo físico de la factura
         String rutaArchivo = null;
         if (archivoFactura != null && !archivoFactura.isEmpty()) {
             rutaArchivo = azureStorageService.subirArchivo(archivoFactura);
         }
 
-        // 3. Preparar la entidad Compra (Cabecera)
         Compra compra = Compra.builder()
                 .nroFactura(request.getNroFactura())
                 .fechaCompra(request.getFechaCompra())
@@ -52,20 +48,16 @@ public class CompraService {
                 .fechaRegistro(LocalDateTime.now())
                 .build();
 
-        // Obtener el estado por defecto para nuevo inventario (Asumiremos que el estado "EN_STOCK" es el ID 1)
         EstadoEpp estadoEnStock = estadoEppRepository.findByNombre("EN_STOCK")
                 .orElseThrow(() -> new BusinessException("El estado EN_STOCK no está configurado en el sistema."));
 
         BigDecimal totalCompra = BigDecimal.ZERO;
 
-        // 4. Procesar cada EPP de la lista (Detalles y Actualización de Stock)
         for (DetalleCompraRequestDTO itemDTO : request.getItems()) {
 
-            // a) Buscar el EPP en el catálogo
             CatalogoEpp epp = catalogoEppRepository.findById(itemDTO.getEppId())
                     .orElseThrow(() -> new BusinessException("EPP no encontrado en catálogo con ID: " + itemDTO.getEppId()));
 
-            // b) Crear detalle de compra
             BigDecimal subtotal = itemDTO.getPrecioUnitario().multiply(BigDecimal.valueOf(itemDTO.getCantidad()));
             totalCompra = totalCompra.add(subtotal);
 
@@ -78,28 +70,36 @@ public class CompraService {
 
             compra.addDetalle(detalle);
 
+            // Trazabilidad al Inventario Central
             Optional<InventarioCentral> inventarioOpt = inventarioCentralRepository.findByEppAndLoteAndEstado(epp, request.getNroFactura(), estadoEnStock);
 
             if (inventarioOpt.isPresent()) {
-                // Si existe, SUMAMOS la cantidad comprada
                 InventarioCentral inv = inventarioOpt.get();
                 inv.setCantidadActual(inv.getCantidadActual() + itemDTO.getCantidad());
-                // Actualizamos la fecha de modificación
                 inv.setUltimaActualizacion(LocalDateTime.now());
+
+                // Actualizar los parámetros logísticos si se envían en la nueva compra
+                if (itemDTO.getCantidadMinima() != null) inv.setCantidadMinima(itemDTO.getCantidadMinima());
+                if (itemDTO.getCantidadMaxima() != null) inv.setCantidadMaxima(itemDTO.getCantidadMaxima());
+                if (itemDTO.getFechaVencimiento() != null) inv.setFechaVencimiento(itemDTO.getFechaVencimiento());
+                if (itemDTO.getObservaciones() != null) inv.setObservaciones(itemDTO.getObservaciones());
+
                 inventarioCentralRepository.save(inv);
                 log.info("Stock actualizado en Inventario Central para EPP: {}", epp.getNombreEpp());
             } else {
-                // Si es un lote nuevo o primer ingreso, CREAMOS el registro
                 InventarioCentral nuevoInv = InventarioCentral.builder()
                         .epp(epp)
                         .estado(estadoEnStock)
                         .cantidadActual(itemDTO.getCantidad())
-                        .cantidadMinima(10) // Valor por defecto sugerido
-                        .cantidadMaxima(100) // Valor por defecto sugerido
+                        // Usamos los enviados en el DTO, o valores por defecto (10 y 100) si son nulos
+                        .cantidadMinima(itemDTO.getCantidadMinima() != null ? itemDTO.getCantidadMinima() : 10)
+                        .cantidadMaxima(itemDTO.getCantidadMaxima() != null ? itemDTO.getCantidadMaxima() : 100)
+                        .fechaVencimiento(itemDTO.getFechaVencimiento())
+                        .observaciones(itemDTO.getObservaciones())
                         .lote(request.getNroFactura())
                         .costoUnitario(BigDecimal.valueOf(itemDTO.getPrecioUnitario().doubleValue()))
                         .proveedor(request.getProveedor())
-                        .ubicacionBodega("Almacén General") // Por defecto
+                        .ubicacionBodega("Almacén General") // Se mantiene por defecto
                         .fechaAdquisicion(request.getFechaCompra())
                         .fechaCreacion(LocalDateTime.now())
                         .ultimaActualizacion(LocalDateTime.now())
