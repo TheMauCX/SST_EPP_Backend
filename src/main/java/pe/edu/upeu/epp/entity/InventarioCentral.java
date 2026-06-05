@@ -10,22 +10,33 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Inventario Central de EPPs.
+ *
+ * Sprint 4 — cambios (HU-17):
+ *   - Se agrega relación ManyToOne con CatalogoTalla (campo talla_id, nullable)
+ *   - La clave única cambia de (epp_id, lote, estado_id) a
+ *     (epp_id, lote, estado_id, talla_id) para soportar stock por talla.
+ *     Hibernate eliminará la constraint antigua y creará la nueva con ddl-auto=update.
+ *     IMPORTANTE: si la BD tiene datos, ejecutar primero el script de migración
+ *     incluido en /scripts/sprint4_migracion_tallas.sql antes de arrancar la app.
+ *
+ * Sprint 4 — cambios (HU-20):
+ *   - Se agregan campos subtotal e igv (calculados y persistidos en CompraService)
+ */
 @Entity
 @Table(name = "inventario_central", schema = "epp",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventario_central_epp_lote_estado",
-                columnNames = {"epp_id", "lote", "estado_id"}
+                name = "uk_inventario_central_epp_lote_estado_talla",
+                columnNames = {"epp_id", "lote", "estado_id", "talla_id"}
         ),
         indexes = {
-                @Index(name = "idx_inv_central_epp", columnList = "epp_id"),
-                @Index(name = "idx_inv_central_estado", columnList = "estado_id"),
-                @Index(name = "idx_inv_central_vencimiento", columnList = "fecha_vencimiento")
+                @Index(name = "idx_inv_central_epp",        columnList = "epp_id"),
+                @Index(name = "idx_inv_central_estado",     columnList = "estado_id"),
+                @Index(name = "idx_inv_central_talla",      columnList = "talla_id"),
+                @Index(name = "idx_inv_central_vencimiento",columnList = "fecha_vencimiento")
         })
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class InventarioCentral {
 
     @Id
@@ -40,6 +51,15 @@ public class InventarioCentral {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "estado_id", nullable = false)
     private EstadoEpp estado;
+
+    /**
+     * Talla de este lote de stock. Nullable: EPPs sin talla (mascarillas,
+     * tapones, etc.) dejan este campo en null.
+     * HU-17
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "talla_id")
+    private CatalogoTalla talla;
 
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
@@ -61,7 +81,7 @@ public class InventarioCentral {
     @Column(name = "fecha_adquisicion")
     private LocalDate fechaAdquisicion;
 
-    @Column(name = "costo_unitario")
+    @Column(name = "costo_unitario", precision = 10, scale = 2)
     private BigDecimal costoUnitario;
 
     @Column(name = "proveedor", length = 200)
@@ -83,7 +103,6 @@ public class InventarioCentral {
     @LastModifiedDate
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
-
 
     @PrePersist
     @PreUpdate

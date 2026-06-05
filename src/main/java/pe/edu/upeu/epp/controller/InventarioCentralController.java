@@ -22,9 +22,6 @@ import pe.edu.upeu.epp.service.InventarioCentralService;
 
 import java.util.List;
 
-/**
- * Controller REST para gestión de Inventario Central.
- */
 @RestController
 @RequestMapping("/api/v1/inventario-central")
 @RequiredArgsConstructor
@@ -34,120 +31,90 @@ public class InventarioCentralController {
 
     private final InventarioCentralService inventarioCentralService;
 
-    /**
-     * Registrar nuevo stock en inventario central.
-     */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Registrar nuevo stock",
-            description = "Registra un nuevo lote de EPP en el inventario central")
+    @Operation(summary = "Registrar nuevo stock")
     public ResponseEntity<InventarioCentralResponseDTO> crear(
             @Valid @RequestBody InventarioCentralRequestDTO request) {
-        InventarioCentralResponseDTO response = inventarioCentralService.crear(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(inventarioCentralService.crear(request));
     }
 
-    /**
-     * Obtener inventario por ID.
-     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
-    @Operation(summary = "Obtener inventario por ID",
-            description = "Retorna los detalles de un registro de inventario específico")
-    public ResponseEntity<InventarioCentralResponseDTO> obtenerPorId(
-            @Parameter(description = "ID del inventario") @PathVariable Integer id) {
-        InventarioCentralResponseDTO response = inventarioCentralService.obtenerPorId(id);
-        return ResponseEntity.ok(response);
+    @Operation(summary = "Obtener inventario por ID")
+    public ResponseEntity<InventarioCentralResponseDTO> obtenerPorId(@PathVariable Integer id) {
+        return ResponseEntity.ok(inventarioCentralService.obtenerPorId(id));
     }
 
     /**
-     * Listar todo el inventario central.
+     * HU-24: Listar inventario central con filtros de orden y bajo stock.
+     *
+     * Parámetros:
+     *   sort=alpha       → ordena alfabéticamente por nombre de EPP
+     *   filter=low_stock → muestra solo EPPs con stock ≤ mínimo
+     *
+     * Se pueden combinar: GET /inventario-central?sort=alpha&filter=low_stock
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
-    @Operation(summary = "Listar todo el inventario",
-            description = "Retorna una lista paginada de todo el inventario central")
+    @Operation(
+            summary = "Listar inventario central",
+            description = "Lista paginada. " +
+                    "Filtros: sort=alpha (orden alfabético) | filter=low_stock (solo bajo stock). " +
+                    "Combinables simultáneamente.")
     public ResponseEntity<Page<InventarioCentralResponseDTO>> listarTodo(
             @PageableDefault(size = 20, sort = "ultimaActualizacion", direction = Sort.Direction.DESC)
-            Pageable pageable) {
-        Page<InventarioCentralResponseDTO> response = inventarioCentralService.listarTodos(pageable);
-        return ResponseEntity.ok(response);
+            Pageable pageable,
+            @Parameter(description = "Ordenar alfabéticamente: alpha")
+            @RequestParam(required = false) String sort,
+            @Parameter(description = "Filtrar por bajo stock: low_stock")
+            @RequestParam(required = false) String filter) {
+        return ResponseEntity.ok(inventarioCentralService.listarTodos(pageable, sort, filter));
     }
 
-    /**
-     * Listar inventario por EPP.
-     */
     @GetMapping("/epp/{eppId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
-    @Operation(summary = "Listar inventario por EPP",
-            description = "Retorna todos los lotes de un EPP específico")
-    public ResponseEntity<List<InventarioCentralResponseDTO>> listarPorEpp(
-            @Parameter(description = "ID del EPP") @PathVariable Integer eppId) {
-        List<InventarioCentralResponseDTO> response = inventarioCentralService.listarPorEpp(eppId);
-        return ResponseEntity.ok(response);
+    @Operation(summary = "Listar inventario por EPP")
+    public ResponseEntity<List<InventarioCentralResponseDTO>> listarPorEpp(@PathVariable Integer eppId) {
+        return ResponseEntity.ok(inventarioCentralService.listarPorEpp(eppId));
     }
 
-    /**
-     * Listar stock bajo (alertas).
-     */
     @GetMapping("/alertas/stock-bajo")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
-    @Operation(summary = "Alertas de stock bajo",
-            description = "Retorna EPPs con cantidad actual menor o igual a la cantidad mínima")
+    @Operation(summary = "Alertas de stock bajo")
     public ResponseEntity<List<InventarioCentralResponseDTO>> listarStockBajo() {
-        List<InventarioCentralResponseDTO> response = inventarioCentralService.listarStockBajo();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(inventarioCentralService.listarStockBajo());
     }
 
-    /**
-     * Listar próximos a vencer.
-     */
     @GetMapping("/alertas/proximos-vencer")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST', 'COORDINADOR_SST')")
-    @Operation(summary = "Alertas de vencimiento",
-            description = "Retorna EPPs que vencerán en los próximos 30 días")
+    @Operation(summary = "Alertas de vencimiento")
     public ResponseEntity<List<InventarioCentralResponseDTO>> listarProximosAVencer() {
-        List<InventarioCentralResponseDTO> response = inventarioCentralService.listarProximosAVencer();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(inventarioCentralService.listarProximosAVencer());
     }
 
-    /**
-     * Actualizar información del inventario.
-     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Actualizar inventario",
-            description = "Actualiza la información de un registro de inventario")
+    @Operation(summary = "Actualizar inventario")
     public ResponseEntity<InventarioCentralResponseDTO> actualizar(
-            @Parameter(description = "ID del inventario") @PathVariable Integer id,
+            @PathVariable Integer id,
             @Valid @RequestBody InventarioCentralUpdateDTO request) {
-        InventarioCentralResponseDTO response = inventarioCentralService.actualizar(id, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(inventarioCentralService.actualizar(id, request));
     }
 
-    /**
-     * Ajustar stock manualmente (ingreso o salida).
-     */
     @PatchMapping("/{id}/ajustar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Ajustar stock",
-            description = "Realiza un ajuste manual de stock (positivo para ingreso, negativo para salida)")
+    @Operation(summary = "Ajustar stock manualmente")
     public ResponseEntity<InventarioCentralResponseDTO> ajustarStock(
-            @Parameter(description = "ID del inventario") @PathVariable Integer id,
+            @PathVariable Integer id,
             @Valid @RequestBody AjusteInventarioDTO request) {
-        InventarioCentralResponseDTO response = inventarioCentralService.ajustarStock(id, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(inventarioCentralService.ajustarStock(id, request));
     }
 
-    /**
-     * Eliminar registro de inventario.
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Eliminar inventario",
-            description = "Elimina un registro de inventario (solo si cantidad es 0)")
-    public ResponseEntity<Void> eliminar(
-            @Parameter(description = "ID del inventario") @PathVariable Integer id) {
+    @Operation(summary = "Eliminar inventario (solo si cantidad = 0)")
+    public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         inventarioCentralService.eliminar(id);
         return ResponseEntity.noContent().build();
     }

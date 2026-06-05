@@ -1,17 +1,9 @@
 package pe.edu.upeu.epp.dto.request;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.*;
+import lombok.*;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class TransferenciaStockDTO {
 
     @NotNull(message = "El ID del EPP es obligatorio")
@@ -24,6 +16,14 @@ public class TransferenciaStockDTO {
     @Min(value = 1, message = "La cantidad debe ser al menos 1")
     private Integer cantidad;
 
-    @Size(max = 500, message = "El motivo no puede exceder 500 caracteres")
+    /**
+     * ID de la talla a transferir.
+     * Obligatorio si el EPP maneja tallas.
+     * Null para EPPs sin talla (mascarillas, tapones, etc.).
+     * HU-17
+     */
+    private Integer tallaId;
+
+    @Size(max = 500)
     private String motivo;
 }

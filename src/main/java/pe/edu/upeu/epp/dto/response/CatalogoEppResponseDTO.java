@@ -1,24 +1,19 @@
 package pe.edu.upeu.epp.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import pe.edu.upeu.epp.entity.CatalogoEpp.TipoUso;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class CatalogoEppResponseDTO {
 
     private Integer eppId;
     private String nombreEpp;
     private TipoUso tipoUso;
 
-    // --- Campos de Ficha Técnica ---
+    // Ficha técnica
     private String aprobacionesNormas;
     private String caracteristicas;
     private String fabricante;
@@ -29,7 +24,14 @@ public class CatalogoEppResponseDTO {
     private String condicionesCambioPrematuro;
     private String fotoReferencia;
 
-    // --- Campos de Auditoría y Estado ---
+    // Sprint 4
+    private String color;
+    private Set<CatalogoTallaResponseDTO> tallasDisponibles;
+
+    /** URL pública del PDF en Azure. Null si no tiene ficha técnica cargada. HU-19 */
+    private String fichaTecnicaPath;
+
+    // Auditoría
     private Boolean activo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;

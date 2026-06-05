@@ -21,6 +21,8 @@ public class InventarioCentralRequestDTO {
     @NotNull(message = "El ID del estado es obligatorio")
     private Integer estadoId;
 
+    private Integer tallaId;
+
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 0, message = "La cantidad no puede ser negativa")
     private Integer cantidadActual;

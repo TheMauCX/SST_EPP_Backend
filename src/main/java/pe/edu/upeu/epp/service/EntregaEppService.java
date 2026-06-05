@@ -71,7 +71,7 @@ public class EntregaEppService {
             EstadoEpp estadoDelItem = estadoEppRepository.findByNombre(estadoSolicitadoNombre)
                     .orElseThrow(() -> new BusinessException("Estado '" + estadoSolicitadoNombre + "' no está configurado."));
 
-            InventarioArea inventarioArea = inventarioAreaRepository.findByAreaAndEppAndEstado(areaDelJefe, catalogoEpp, estadoDelItem)
+            InventarioArea inventarioArea = inventarioAreaRepository.findByEppAndAreaAndEstado(catalogoEpp, areaDelJefe, estadoDelItem)
                     .orElseThrow(() -> new BusinessException("Stock '" + estadoDelItem.getNombre() + "' no encontrado para '" + catalogoEpp.getNombreEpp() + "'."));
 
             if (inventarioArea.getCantidadActual() < item.getCantidad()) {

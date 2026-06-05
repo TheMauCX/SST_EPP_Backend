@@ -1,26 +1,31 @@
 package pe.edu.upeu.epp.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Min;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
+/**
+ * Inventario por Área.
+ *
+ * Sprint 4 — cambios (HU-17):
+ *   - Se agrega relación ManyToOne con CatalogoTalla (campo talla_id, nullable)
+ *   - La clave única cambia a (epp_id, area_id, estado_id, talla_id)
+ */
 @Entity
 @Table(name = "inventario_area", schema = "epp",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventario_area_epp_area_estado",
-                columnNames = {"epp_id", "area_id", "estado_id"}
+                name = "uk_inventario_area_epp_area_estado_talla",
+                columnNames = {"epp_id", "area_id", "estado_id", "talla_id"}
         ),
         indexes = {
-                @Index(name = "idx_inv_area_epp", columnList = "epp_id"),
-                @Index(name = "idx_inv_area_area", columnList = "area_id"),
-                @Index(name = "idx_inv_area_estado", columnList = "estado_id")
+                @Index(name = "idx_inv_area_epp",    columnList = "epp_id"),
+                @Index(name = "idx_inv_area_area",   columnList = "area_id"),
+                @Index(name = "idx_inv_area_estado", columnList = "estado_id"),
+                @Index(name = "idx_inv_area_talla",  columnList = "talla_id")
         })
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class InventarioArea {
 
     @Id
@@ -39,6 +44,14 @@ public class InventarioArea {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "estado_id", nullable = false)
     private EstadoEpp estado;
+
+    /**
+     * Talla de este registro de stock. Nullable para EPPs sin talla.
+     * HU-17
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "talla_id")
+    private CatalogoTalla talla;
 
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
@@ -75,9 +88,7 @@ public class InventarioArea {
 
     @Transient
     public Integer calcularPorcentajeStock() {
-        if (cantidadMaxima == null || cantidadMaxima == 0) {
-            return null;
-        }
+        if (cantidadMaxima == null || cantidadMaxima == 0) return null;
         return (cantidadActual * 100) / cantidadMaxima;
     }
 }

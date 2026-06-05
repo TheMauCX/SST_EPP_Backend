@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import pe.edu.upeu.epp.entity.CatalogoEpp.TipoUso;
 
+import java.util.Set;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -44,4 +46,9 @@ public class CatalogoEppUpdateDTO {
 
     // Permitimos cambiar el estado activo/inactivo desde la actualización
     private Boolean activo;
+
+    @Size(max = 60)
+    private String color;
+
+    private Set<Integer> tallaIds;
 }

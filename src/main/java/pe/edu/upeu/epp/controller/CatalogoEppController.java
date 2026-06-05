@@ -30,7 +30,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/catalogo-epp")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Catálogo EPP", description = "Gestión del catálogo y fichas técnicas de Equipos de Protección Personal")
+@Tag(name = "Catálogo EPP", description = "Gestión del catálogo de Equipos de Protección Personal")
 @SecurityRequirement(name = "Bearer Authentication")
 public class CatalogoEppController {
 
@@ -38,46 +38,56 @@ public class CatalogoEppController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Crear nuevo EPP", description = "Crea un nuevo tipo de EPP en el catálogo adjuntando su foto")
+    @Operation(summary = "Crear nuevo EPP")
     public ResponseEntity<?> crear(
             @RequestPart("eppData") String eppDataJson,
             @RequestPart(value = "fotoArchivo", required = false) MultipartFile fotoArchivo) {
-
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            CatalogoEppRequestDTO request = mapper.readValue(eppDataJson, CatalogoEppRequestDTO.class);
-
-            CatalogoEppResponseDTO response = catalogoEppService.crear(request, fotoArchivo);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
+            CatalogoEppRequestDTO request = new ObjectMapper().readValue(eppDataJson, CatalogoEppRequestDTO.class);
+            return ResponseEntity.status(HttpStatus.CREATED).body(catalogoEppService.crear(request, fotoArchivo));
         } catch (Exception e) {
-            log.error("Error al crear EPP en catálogo: ", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+            log.error("Error al crear EPP: ", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Actualizar EPP", description = "Actualiza la Ficha Técnica de un EPP y opcionalmente su foto")
+    @Operation(summary = "Actualizar EPP")
     public ResponseEntity<?> actualizar(
             @PathVariable Integer id,
             @RequestPart("eppData") String eppDataJson,
             @RequestPart(value = "fotoArchivo", required = false) MultipartFile fotoArchivo) {
-
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            CatalogoEppUpdateDTO request = mapper.readValue(eppDataJson, CatalogoEppUpdateDTO.class);
-
-            CatalogoEppResponseDTO response = catalogoEppService.actualizar(id, request, fotoArchivo);
-            return ResponseEntity.ok(response);
-
+            CatalogoEppUpdateDTO request = new ObjectMapper().readValue(eppDataJson, CatalogoEppUpdateDTO.class);
+            return ResponseEntity.ok(catalogoEppService.actualizar(id, request, fotoArchivo));
         } catch (Exception e) {
-            log.error("Error al actualizar EPP en catálogo: ", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+            log.error("Error al actualizar EPP: ", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    // --- EL RESTO DE ENDPOINTS SE MANTIENEN INTACTOS ---
+    /**
+     * HU-19: Subir o reemplazar la ficha técnica PDF de un EPP.
+     * El archivo debe ser .pdf y pesar menos de 5 MB.
+     */
+    @PostMapping(value = "/{id}/ficha-tecnica", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(
+            summary = "Subir ficha técnica PDF",
+            description = "Adjunta o reemplaza el archivo PDF de la ficha técnica de un EPP. " +
+                    "Máximo 5 MB, solo formato PDF.")
+    public ResponseEntity<?> subirFichaTecnica(
+            @Parameter(description = "ID del EPP") @PathVariable Integer id,
+            @RequestPart("fichaTecnica") MultipartFile pdfFile) {
+        try {
+            CatalogoEppResponseDTO response = catalogoEppService.subirFichaTecnica(id, pdfFile);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error al subir ficha técnica para EPP {}: ", id, e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     @GetMapping("/{id}")
     @Operation(summary = "Obtener EPP por ID")
@@ -85,15 +95,24 @@ public class CatalogoEppController {
         return ResponseEntity.ok(catalogoEppService.obtenerPorId(id));
     }
 
+    /**
+     * HU-23: Listar EPPs con filtro por rotación.
+     * Parámetro ?rotacion=alta|nula   (omitir para ver todos)
+     */
     @GetMapping
-    @Operation(summary = "Listar todos los EPPs")
+    @Operation(
+            summary = "Listar EPPs",
+            description = "Lista paginada de EPPs del catálogo. " +
+                    "Filtros: rotacion=alta (con salidas recientes) | rotacion=nula (inmovilizados)")
     public ResponseEntity<Page<CatalogoEppResponseDTO>> listarTodos(
-            @PageableDefault(size = 20, sort = "nombreEpp", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(catalogoEppService.listarTodos(pageable));
+            @PageableDefault(size = 20, sort = "nombreEpp", direction = Sort.Direction.ASC) Pageable pageable,
+            @Parameter(description = "Filtro por rotación: alta | nula")
+            @RequestParam(required = false) String rotacion) {
+        return ResponseEntity.ok(catalogoEppService.listarTodos(pageable, rotacion));
     }
 
     @GetMapping("/activos")
-    @Operation(summary = "Listar EPPs activos")
+    @Operation(summary = "Listar EPPs activos (sin paginar)")
     public ResponseEntity<List<CatalogoEppResponseDTO>> listarActivos() {
         return ResponseEntity.ok(catalogoEppService.listarActivos());
     }
@@ -105,26 +124,26 @@ public class CatalogoEppController {
     }
 
     @GetMapping("/fabricante")
-    @Operation(summary = "Buscar EPPs por Fabricante")
+    @Operation(summary = "Buscar EPPs por fabricante")
     public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorFabricante(@RequestParam String fabricante) {
         return ResponseEntity.ok(catalogoEppService.buscarPorFabricante(fabricante));
     }
 
     @GetMapping("/norma")
-    @Operation(summary = "Buscar EPPs por Norma")
+    @Operation(summary = "Buscar EPPs por norma")
     public ResponseEntity<List<CatalogoEppResponseDTO>> buscarPorNorma(@RequestParam String norma) {
         return ResponseEntity.ok(catalogoEppService.buscarPorNorma(norma));
     }
 
     @GetMapping("/tipo/{tipoUso}")
-    @Operation(summary = "Listar EPPs por tipo")
+    @Operation(summary = "Listar EPPs por tipo de uso")
     public ResponseEntity<List<CatalogoEppResponseDTO>> listarPorTipo(@PathVariable CatalogoEpp.TipoUso tipoUso) {
         return ResponseEntity.ok(catalogoEppService.listarPorTipo(tipoUso));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Eliminar EPP (Desactivar)")
+    @Operation(summary = "Desactivar EPP")
     public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         catalogoEppService.eliminar(id);
         return ResponseEntity.noContent().build();
