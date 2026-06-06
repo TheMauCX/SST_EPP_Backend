@@ -8,6 +8,15 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
+/**
+ * Detalle de un ítem dentro de una factura de compra.
+ *
+ * Fix: se agrega relación ManyToOne con CatalogoTalla para registrar
+ * qué talla específica se compró. Nullable para EPPs sin talla.
+ *
+ * Esto completa la trazabilidad: factura → ítem (EPP + talla + cantidad + precio)
+ * → registro en inventario central (EPP + lote + talla + cantidad).
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -28,6 +37,14 @@ public class DetalleCompra {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "epp_id", nullable = false)
     private CatalogoEpp epp;
+
+    /**
+     * Talla comprada. Nullable para EPPs sin talla.
+     * Si se compra "Casco talla M × 30 unidades", aquí queda la talla M.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "talla_id")
+    private CatalogoTalla talla;
 
     @Column(nullable = false)
     private Integer cantidad;

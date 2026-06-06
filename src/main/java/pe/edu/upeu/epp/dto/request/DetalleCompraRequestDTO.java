@@ -14,6 +14,14 @@ public class DetalleCompraRequestDTO {
     @NotNull(message = "El ID del EPP es obligatorio")
     private Integer eppId;
 
+    /**
+     * Talla del EPP comprado.
+     * Obligatorio si el EPP maneja tallas (cascos, guantes, botas, ropa).
+     * Dejar null para EPPs sin talla (mascarillas caja x50, tapones, etc.).
+     * El ID se obtiene desde GET /api/v1/tallas
+     */
+    private Integer tallaId;
+
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 1, message = "La cantidad debe ser mayor a 0")
     private Integer cantidad;

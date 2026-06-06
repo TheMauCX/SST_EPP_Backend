@@ -1,4 +1,5 @@
 package pe.edu.upeu.epp.security;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,82 +21,96 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import pe.edu.upeu.epp.security.JwtAuthenticationFilter;
+
 import java.util.Arrays;
 import java.util.List;
-/**
 
- Configuración de seguridad de Spring Security.
- Define la cadena de filtros, autenticación JWT, CORS y autorizaciones por rol.
- */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Habilita @PreAuthorize, @Secured, etc.
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
-    /**
 
-     Configura la cadena de filtros de seguridad.
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-// Deshabilitar CSRF (no necesario para APIs stateless con JWT)
                 .csrf(AbstractHttpConfigurer::disable)
-                // Configurar CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Configurar autorización de endpoints
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos (sin autenticación)
+
+                        // ── Endpoints públicos ──────────────────────────────────
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/api/v1/test-azure/**").permitAll()
 
-                        // Endpoints de administración (solo ADMINISTRADOR_SISTEMA)
-                        .requestMatchers("/api/v1/admin/**").hasRole("ADMINISTRADOR_SISTEMA")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
+                        // ── Catálogo EPP (escritura solo ADMIN) ─────────────────
+                        .requestMatchers(HttpMethod.POST,   "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
+                        .requestMatchers(HttpMethod.PUT,    "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
 
-                        // Endpoints de gestión de inventario central
-                        .requestMatchers("/api/v1/inventario-central/**").hasAnyRole("SUPERVISOR_SST", "ADMINISTRADOR_SISTEMA")
+                        // ── Tallas (solo ADMIN) ─────────────────────────────────
+                        .requestMatchers(HttpMethod.POST,   "/api/v1/tallas/**").hasRole("ADMINISTRADOR_SISTEMA")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/tallas/**").hasRole("ADMINISTRADOR_SISTEMA")
 
-                        // Endpoints de entregas (JEFE_AREA y SUPERVISOR_SST)
-                        .requestMatchers(HttpMethod.POST, "/api/v1/entregas/**").hasAnyRole("JEFE_AREA", "SUPERVISOR_SST")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/entregas/**").hasAnyRole("JEFE_AREA", "SUPERVISOR_SST", "COORDINADOR_SST")
+                        // ── Inventario central ──────────────────────────────────
+                        .requestMatchers("/api/v1/inventario-central/**")
+                        .hasAnyRole("SUPERVISOR_SST", "ADMINISTRADOR_SISTEMA")
 
-                        // Endpoints de solicitudes de reposición
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-reposicion").hasRole("JEFE_AREA")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/aprobar").hasRole("SUPERVISOR_SST")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/rechazar").hasRole("SUPERVISOR_SST")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-reposicion/**").hasAnyRole("JEFE_AREA", "SUPERVISOR_SST", "COORDINADOR_SST")
+                        // ── Entregas (ADMIN + SUPERVISOR_SST + JEFE_AREA) ───────
+                        // FIX: ADMINISTRADOR_SISTEMA estaba ausente en esta regla,
+                        // causando 403 aunque el @PreAuthorize del controller lo permitía.
+                        // La regla del SecurityConfig se evalúa ANTES que @PreAuthorize.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/entregas/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA")
+                        .requestMatchers(HttpMethod.GET,  "/api/v1/entregas/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
 
-                        // Endpoints de reportes (accesibles para roles con permisos de lectura)
-                        .requestMatchers("/api/v1/reportes/**").hasAnyRole("SUPERVISOR_SST", "COORDINADOR_SST", "ADMINISTRADOR_SISTEMA")
+                        // ── Inventario área ─────────────────────────────────────
+                        .requestMatchers("/api/v1/inventario-area/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
 
-                        // Todos los demás endpoints requieren autenticación
+                        // ── Trabajadores ────────────────────────────────────────
+                        .requestMatchers("/api/v1/trabajadores/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
+
+                        // ── Áreas ───────────────────────────────────────────────
+                        .requestMatchers("/api/v1/areas/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "COORDINADOR_SST")
+
+                        // ── Compras ─────────────────────────────────────────────
+                        .requestMatchers("/api/v1/compras/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST")
+
+                        // ── Reportes ────────────────────────────────────────────
+                        .requestMatchers("/api/v1/reportes/**")
+                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "COORDINADOR_SST")
+
+                        // ── Solicitudes de reposición (fuera de alcance MVP) ────
+                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-reposicion")
+                        .hasRole("JEFE_AREA")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/aprobar")
+                        .hasRole("SUPERVISOR_SST")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/rechazar")
+                        .hasRole("SUPERVISOR_SST")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-reposicion/**")
+                        .hasAnyRole("JEFE_AREA", "SUPERVISOR_SST", "COORDINADOR_SST")
+
+                        // ── Todo lo demás requiere autenticación ─────────────────
                         .anyRequest().authenticated()
                 )
-
-                // Configurar gestión de sesiones (stateless para JWT)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-
-                // Agregar el filtro JWT antes del filtro de autenticación de usuario/contraseña
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 
-    /**
-
-     Proveedor de autenticación que usa UserDetailsService y PasswordEncoder.
-     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -104,32 +119,19 @@ public class SecurityConfig {
         return authProvider;
     }
 
-    /**
-
-     AuthenticationManager para autenticación manual (usado en login).
-     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    /**
-
-     Encoder de contraseñas BCrypt.
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-
-     Configuración de CORS.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-// Orígenes permitidos (ajustar según ambiente)
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "http://localhost:5354",
@@ -137,16 +139,12 @@ public class SecurityConfig {
                 "http://localhost:5000",
                 "http://10.0.2.2:8080",
                 "http://172.17.25.28:8080"
-
         ));
-// Métodos HTTP permitidos
         configuration.setAllowedMethods(Arrays.asList("GET", "PATCH", "POST", "PUT", "DELETE", "OPTIONS"));
-// Headers permitidos
         configuration.setAllowedHeaders(List.of("*"));
-// Permitir credenciales (cookies, headers de autorización)
         configuration.setAllowCredentials(true);
-// Tiempo de cache de la configuración CORS (1 hora)
         configuration.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

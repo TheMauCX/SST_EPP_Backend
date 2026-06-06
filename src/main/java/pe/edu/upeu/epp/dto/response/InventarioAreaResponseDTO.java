@@ -22,6 +22,10 @@ public class InventarioAreaResponseDTO {
     private String areaNombre;
     private CatalogoEpp.TipoUso tipoUso;
 
+    // Talla de este stock (null si el EPP no maneja tallas)
+    private Integer tallaId;
+    private String tallaNombre;
+
     private Integer estadoId;
     private String estadoNombre;
     private String estadoDescripcion;

@@ -33,8 +33,6 @@ public class InventarioCentralService {
     private final EstadoEppRepository estadoEppRepository;
     private final CatalogoTallaRepository tallaRepository;
 
-    // ── Crear ────────────────────────────────────────────────────────────
-
     @Transactional
     public InventarioCentralResponseDTO crear(InventarioCentralRequestDTO request) {
         CatalogoEpp epp = catalogoEppRepository.findById(request.getEppId())
@@ -42,14 +40,12 @@ public class InventarioCentralService {
         EstadoEpp estado = estadoEppRepository.findById(request.getEstadoId())
                 .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
 
-        // Resolver talla (opcional)
         CatalogoTalla talla = null;
         if (request.getTallaId() != null) {
             talla = tallaRepository.findById(request.getTallaId())
                     .orElseThrow(() -> new EntityNotFoundException("Talla no encontrada con ID: " + request.getTallaId()));
         }
 
-        // Verificar unicidad con la nueva clave (epp, lote, estado, talla)
         boolean existe = talla != null
                 ? inventarioCentralRepository.existsByEppAndLoteAndEstadoAndTalla(epp, request.getLote(), estado, talla)
                 : inventarioCentralRepository.findByEppAndLoteAndEstadoSinTalla(epp, request.getLote(), estado).isPresent();
@@ -79,38 +75,24 @@ public class InventarioCentralService {
         return mapToResponseDTO(inventarioCentralRepository.save(inventario));
     }
 
-    // ── Listar con filtros HU-24 ─────────────────────────────────────────
-
-    /**
-     * Listar inventario central con filtros opcionales:
-     *   sort=alpha       → ordenar alfabéticamente por nombre de EPP
-     *   filter=low_stock → solo EPPs con stock ≤ mínimo
-     *
-     * Los filtros son combinables.
-     */
     @Transactional(readOnly = true)
     public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable, String sort, String filter) {
-        boolean ordenAlfa    = "alpha".equalsIgnoreCase(sort);
+        boolean ordenAlfa     = "alpha".equalsIgnoreCase(sort);
         boolean soloStockBajo = "low_stock".equalsIgnoreCase(filter);
 
-        // Construir Pageable con sort correcto
         Pageable pageableEfectivo = pageable;
         if (ordenAlfa) {
             pageableEfectivo = PageRequest.of(
-                    pageable.getPageNumber(),
-                    pageable.getPageSize(),
+                    pageable.getPageNumber(), pageable.getPageSize(),
                     Sort.by("epp.nombreEpp").ascending());
         }
 
         if (soloStockBajo && ordenAlfa) {
-            return inventarioCentralRepository.findStockBajoPaginado(pageableEfectivo)
-                    .map(this::mapToResponseDTO);
+            return inventarioCentralRepository.findStockBajoPaginado(pageableEfectivo).map(this::mapToResponseDTO);
         } else if (soloStockBajo) {
-            return inventarioCentralRepository.findStockBajoPaginado(pageable)
-                    .map(this::mapToResponseDTO);
+            return inventarioCentralRepository.findStockBajoPaginado(pageable).map(this::mapToResponseDTO);
         } else if (ordenAlfa) {
-            return inventarioCentralRepository.findAllOrderByNombreEppAsc(pageableEfectivo)
-                    .map(this::mapToResponseDTO);
+            return inventarioCentralRepository.findAllOrderByNombreEppAsc(pageableEfectivo).map(this::mapToResponseDTO);
         } else {
             return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
         }
@@ -120,8 +102,6 @@ public class InventarioCentralService {
     public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable) {
         return listarTodos(pageable, null, null);
     }
-
-    // ── Actualizar ───────────────────────────────────────────────────────
 
     @Transactional
     public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
@@ -158,8 +138,8 @@ public class InventarioCentralService {
             }
         }
 
-        if (request.getEstadoId() != null) inventarioActual.setEstado(nuevoEstado);
-        if (request.getLote() != null) inventarioActual.setLote(nuevoLote);
+        if (request.getEstadoId() != null)    inventarioActual.setEstado(nuevoEstado);
+        if (request.getLote() != null)         inventarioActual.setLote(nuevoLote);
         if (request.getCantidadMinima() != null) inventarioActual.setCantidadMinima(request.getCantidadMinima());
         if (request.getCantidadMaxima() != null) inventarioActual.setCantidadMaxima(request.getCantidadMaxima());
         if (request.getUbicacionBodega() != null) inventarioActual.setUbicacionBodega(request.getUbicacionBodega());
@@ -167,8 +147,6 @@ public class InventarioCentralService {
 
         return mapToResponseDTO(inventarioCentralRepository.save(inventarioActual));
     }
-
-    // ── Consultas básicas ────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public InventarioCentralResponseDTO obtenerPorId(Integer id) {
@@ -223,7 +201,7 @@ public class InventarioCentralService {
         inventarioCentralRepository.delete(inventario);
     }
 
-    // ── Mapeo ─────────────────────────────────────────────────────────────
+    // ── Mapeo (ahora incluye talla) ───────────────────────────────────────
 
     private InventarioCentralResponseDTO mapToResponseDTO(InventarioCentral inv) {
         return InventarioCentralResponseDTO.builder()
@@ -232,6 +210,8 @@ public class InventarioCentralService {
                 .eppNombre(inv.getEpp().getNombreEpp())
                 .eppCodigoIdentificacion(null)
                 .tipoUso(inv.getEpp().getTipoUso())
+                .tallaId(inv.getTalla() != null ? inv.getTalla().getTallaId() : null)
+                .tallaNombre(inv.getTalla() != null ? inv.getTalla().getNombre() : null)
                 .estadoId(inv.getEstado().getEstadoId())
                 .estadoNombre(inv.getEstado().getNombre())
                 .estadoDescripcion(inv.getEstado().getDescripcion())
