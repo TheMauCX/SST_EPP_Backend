@@ -11,18 +11,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * Inventario Central de EPPs.
+ * Inventario Central.
  *
- * Sprint 4 — cambios (HU-17):
- *   - Se agrega relación ManyToOne con CatalogoTalla (campo talla_id, nullable)
- *   - La clave única cambia de (epp_id, lote, estado_id) a
- *     (epp_id, lote, estado_id, talla_id) para soportar stock por talla.
- *     Hibernate eliminará la constraint antigua y creará la nueva con ddl-auto=update.
- *     IMPORTANTE: si la BD tiene datos, ejecutar primero el script de migración
- *     incluido en /scripts/sprint4_migracion_tallas.sql antes de arrancar la app.
- *
- * Sprint 4 — cambios (HU-20):
- *   - Se agregan campos subtotal e igv (calculados y persistidos en CompraService)
+ * Sprint 4b: se eliminan cantidadMinima y cantidadMaxima.
+ * Los umbrales de alerta ahora viven en CatalogoEpp y aplican
+ * globalmente para ese tipo de EPP, independientemente del lote.
  */
 @Entity
 @Table(name = "inventario_central", schema = "epp",
@@ -31,10 +24,10 @@ import java.time.LocalDateTime;
                 columnNames = {"epp_id", "lote", "estado_id", "talla_id"}
         ),
         indexes = {
-                @Index(name = "idx_inv_central_epp",        columnList = "epp_id"),
-                @Index(name = "idx_inv_central_estado",     columnList = "estado_id"),
-                @Index(name = "idx_inv_central_talla",      columnList = "talla_id"),
-                @Index(name = "idx_inv_central_vencimiento",columnList = "fecha_vencimiento")
+                @Index(name = "idx_inv_central_epp",         columnList = "epp_id"),
+                @Index(name = "idx_inv_central_estado",      columnList = "estado_id"),
+                @Index(name = "idx_inv_central_talla",       columnList = "talla_id"),
+                @Index(name = "idx_inv_central_vencimiento", columnList = "fecha_vencimiento")
         })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class InventarioCentral {
@@ -52,11 +45,6 @@ public class InventarioCentral {
     @JoinColumn(name = "estado_id", nullable = false)
     private EstadoEpp estado;
 
-    /**
-     * Talla de este lote de stock. Nullable: EPPs sin talla (mascarillas,
-     * tapones, etc.) dejan este campo en null.
-     * HU-17
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "talla_id")
     private CatalogoTalla talla;
@@ -64,13 +52,6 @@ public class InventarioCentral {
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
     private Integer cantidadActual = 0;
-
-    @Min(0)
-    @Column(name = "cantidad_minima", nullable = false)
-    private Integer cantidadMinima = 0;
-
-    @Column(name = "cantidad_maxima")
-    private Integer cantidadMaxima;
 
     @Column(name = "ubicacion_bodega", length = 100)
     private String ubicacionBodega;
@@ -110,17 +91,26 @@ public class InventarioCentral {
         ultimaActualizacion = LocalDateTime.now();
     }
 
-    @Transient
-    public boolean necesitaReposicion() {
-        return cantidadActual <= cantidadMinima;
-    }
+    // ── Helpers transient ────────────────────────────────────────────────────
 
+    /**
+     * Stock disponible: solo cuenta si el estado permite uso.
+     */
     @Transient
     public Integer getCantidadDisponible() {
         if (this.estado != null && Boolean.TRUE.equals(this.estado.getPermiteUso())) {
             return this.cantidadActual;
         }
         return 0;
+    }
+
+    /**
+     * Necesita reposición: compara con el umbral definido en el catálogo del EPP.
+     */
+    @Transient
+    public boolean necesitaReposicion() {
+        if (this.epp == null || this.epp.getCantidadMinima() == null) return false;
+        return cantidadActual <= this.epp.getCantidadMinima();
     }
 
     @Transient

@@ -38,9 +38,9 @@ public interface EntregaEppRepository extends JpaRepository<EntregaEpp, Integer>
      * Obtener entregas realizadas por un jefe de área.
      * Útil para auditoría y seguimiento de quien entrega.
      */
-    @Query("SELECT e FROM EntregaEpp e WHERE e.jefeArea.trabajador.trabajadorId = :jefeAreaId " +
+    @Query("SELECT e FROM EntregaEpp e WHERE e.supervisorUsuario.usuarioId = :supervisorId " +
             "ORDER BY e.fechaEntrega DESC")
-    Page<EntregaEpp> findByJefeArea(@Param("jefeAreaId") Integer jefeAreaId, Pageable pageable);
+    Page<EntregaEpp> findBySupervisor(@Param("supervisorId") Integer supervisorId, Pageable pageable);
 
     /**
      * Obtener entregas en un rango de fechas.

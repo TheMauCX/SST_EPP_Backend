@@ -79,12 +79,12 @@ public class ReporteService {
                             .collect(Collectors.toList());
 
                     String entregadoPor = null;
-                    if (entrega.getJefeArea() != null) {
-                        if (entrega.getJefeArea().getTrabajador() != null) {
-                            Trabajador jefe = entrega.getJefeArea().getTrabajador();
-                            entregadoPor = jefe.getNombres() + " " + jefe.getApellidos();
+                    if (entrega.getSupervisorUsuario() != null) {
+                        Usuario supervisor = entrega.getSupervisorUsuario();
+                        if (supervisor.getNombreCompleto() != null && !supervisor.getNombreCompleto().isBlank()) {
+                            entregadoPor = supervisor.getNombreCompleto();
                         } else {
-                            entregadoPor = entrega.getJefeArea().getNombreUsuario();
+                            entregadoPor = supervisor.getNombreUsuario();
                         }
                     }
 

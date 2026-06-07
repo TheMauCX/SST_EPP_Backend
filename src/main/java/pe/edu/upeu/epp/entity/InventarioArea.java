@@ -9,9 +9,8 @@ import java.time.LocalDateTime;
 /**
  * Inventario por Área.
  *
- * Sprint 4 — cambios (HU-17):
- *   - Se agrega relación ManyToOne con CatalogoTalla (campo talla_id, nullable)
- *   - La clave única cambia a (epp_id, area_id, estado_id, talla_id)
+ * Sprint 4b: se eliminan cantidadMinima y cantidadMaxima.
+ * Los umbrales de alerta viven en CatalogoEpp.
  */
 @Entity
 @Table(name = "inventario_area", schema = "epp",
@@ -45,10 +44,6 @@ public class InventarioArea {
     @JoinColumn(name = "estado_id", nullable = false)
     private EstadoEpp estado;
 
-    /**
-     * Talla de este registro de stock. Nullable para EPPs sin talla.
-     * HU-17
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "talla_id")
     private CatalogoTalla talla;
@@ -56,13 +51,6 @@ public class InventarioArea {
     @Min(0)
     @Column(name = "cantidad_actual", nullable = false)
     private Integer cantidadActual = 0;
-
-    @Min(0)
-    @Column(name = "cantidad_minima", nullable = false)
-    private Integer cantidadMinima = 0;
-
-    @Column(name = "cantidad_maxima")
-    private Integer cantidadMaxima;
 
     @Column(name = "ubicacion", length = 100)
     private String ubicacion;
@@ -78,7 +66,8 @@ public class InventarioArea {
 
     @Transient
     public boolean necesitaReposicion() {
-        return cantidadActual <= cantidadMinima;
+        if (this.epp == null || this.epp.getCantidadMinima() == null) return false;
+        return cantidadActual <= this.epp.getCantidadMinima();
     }
 
     @Transient
@@ -88,7 +77,8 @@ public class InventarioArea {
 
     @Transient
     public Integer calcularPorcentajeStock() {
-        if (cantidadMaxima == null || cantidadMaxima == 0) return null;
-        return (cantidadActual * 100) / cantidadMaxima;
+        Integer max = this.epp != null ? this.epp.getCantidadMaxima() : null;
+        if (max == null || max == 0) return null;
+        return (cantidadActual * 100) / max;
     }
 }

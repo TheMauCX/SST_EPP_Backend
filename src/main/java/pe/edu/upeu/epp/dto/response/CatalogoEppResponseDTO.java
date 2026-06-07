@@ -23,13 +23,15 @@ public class CatalogoEppResponseDTO {
     private String condicionesAlmacenamiento;
     private String condicionesCambioPrematuro;
     private String fotoReferencia;
-
-    // Sprint 4
+    private String fichaTecnicaPath;
     private String color;
+
+    // Tallas
     private Set<CatalogoTallaResponseDTO> tallasDisponibles;
 
-    /** URL pública del PDF en Azure. Null si no tiene ficha técnica cargada. HU-19 */
-    private String fichaTecnicaPath;
+    // Umbrales de stock (sprint 4b)
+    private Integer cantidadMinima;
+    private Integer cantidadMaxima;
 
     // Auditoría
     private Boolean activo;

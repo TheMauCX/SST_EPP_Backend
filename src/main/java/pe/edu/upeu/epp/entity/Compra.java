@@ -12,16 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Registro de una compra/factura de EPPs.
+ * Registro de compra/factura.
  *
- * Sprint 4 — cambios (HU-20):
- *   - Se agregan campos: subtotal, igv, montoTotal.
- *     El campo 'montoTotal' existía antes. Ahora representa el TOTAL CON IGV.
- *     Hibernate agrega las dos columnas nuevas con ddl-auto=update (ALTER TABLE).
- *
- * Regla de negocio (Perú, IGV 18%):
- *   subtotal = montoTotal / 1.18   (redondeado a 2 decimales HALF_UP)
- *   igv      = montoTotal - subtotal
+ * Sprint 4b: se agrega rutaArchivoCotizacion (campo opcional).
  */
 @Data
 @Builder
@@ -46,29 +39,26 @@ public class Compra {
     @Column(length = 150)
     private String proveedor;
 
-    /**
-     * Monto sin IGV. Calculado en CompraService.
-     * HU-20
-     */
     @Column(name = "subtotal", precision = 10, scale = 2)
     private BigDecimal subtotal;
 
-    /**
-     * Monto del IGV (18%). Calculado en CompraService.
-     * HU-20
-     */
     @Column(name = "igv", precision = 10, scale = 2)
     private BigDecimal igv;
 
-    /**
-     * Total con IGV incluido. Existía en sprints anteriores.
-     * Ahora es montoTotal = subtotal + igv.
-     */
     @Column(name = "monto_total", precision = 10, scale = 2)
     private BigDecimal montoTotal;
 
+    /** URL pública de la factura en Azure (campo existente). */
     @Column(name = "ruta_archivo_factura", length = 500)
     private String rutaArchivoFactura;
+
+    /**
+     * URL pública del archivo de cotización en Azure.
+     * Opcional: puede ser null si no se adjuntó cotización.
+     * Sprint 4b.
+     */
+    @Column(name = "ruta_archivo_cotizacion", length = 500)
+    private String rutaArchivoCotizacion;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_registro_id")

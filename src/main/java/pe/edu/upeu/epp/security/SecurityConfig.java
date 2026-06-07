@@ -25,6 +25,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Configuración de seguridad.
+ *
+ * Sprint 4b:
+ *   El producto es de uso exclusivo para personal SST.
+ *   Los roles activos son: SUPERVISOR_SST (principal) y ADMINISTRADOR_SISTEMA (legacy/compatibilidad).
+ *   Todos los endpoints de gestión son accesibles para ambos roles sin distinción,
+ *   ya que el supervisor SST tiene acceso completo al sistema.
+ *
+ *   Roles eliminados del alcance MVP: JEFE_AREA, COORDINADOR_SST.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -34,89 +45,41 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
+    // Roles activos en el MVP
+    private static final String SUPERVISOR = "SUPERVISOR_SST";
+    private static final String ADMIN      = "ADMINISTRADOR_SISTEMA";
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
 
-                        // ── Endpoints públicos ──────────────────────────────────
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/api/v1/test-azure/**").permitAll()
+                // ── Público ─────────────────────────────────────────────
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/api/v1/test-azure/**").permitAll()
 
-                        // ── Catálogo EPP (escritura solo ADMIN) ─────────────────
-                        .requestMatchers(HttpMethod.POST,   "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
-                        .requestMatchers(HttpMethod.PUT,    "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/catalogo-epp/**").hasRole("ADMINISTRADOR_SISTEMA")
-
-                        // ── Tallas (solo ADMIN) ─────────────────────────────────
-                        .requestMatchers(HttpMethod.POST,   "/api/v1/tallas/**").hasRole("ADMINISTRADOR_SISTEMA")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/tallas/**").hasRole("ADMINISTRADOR_SISTEMA")
-
-                        // ── Inventario central ──────────────────────────────────
-                        .requestMatchers("/api/v1/inventario-central/**")
-                        .hasAnyRole("SUPERVISOR_SST", "ADMINISTRADOR_SISTEMA")
-
-                        // ── Entregas (ADMIN + SUPERVISOR_SST + JEFE_AREA) ───────
-                        // FIX: ADMINISTRADOR_SISTEMA estaba ausente en esta regla,
-                        // causando 403 aunque el @PreAuthorize del controller lo permitía.
-                        // La regla del SecurityConfig se evalúa ANTES que @PreAuthorize.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/entregas/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA")
-                        .requestMatchers(HttpMethod.GET,  "/api/v1/entregas/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
-
-                        // ── Inventario área ─────────────────────────────────────
-                        .requestMatchers("/api/v1/inventario-area/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
-
-                        // ── Trabajadores ────────────────────────────────────────
-                        .requestMatchers("/api/v1/trabajadores/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "JEFE_AREA", "COORDINADOR_SST")
-
-                        // ── Áreas ───────────────────────────────────────────────
-                        .requestMatchers("/api/v1/areas/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "COORDINADOR_SST")
-
-                        // ── Compras ─────────────────────────────────────────────
-                        .requestMatchers("/api/v1/compras/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST")
-
-                        // ── Reportes ────────────────────────────────────────────
-                        .requestMatchers("/api/v1/reportes/**")
-                        .hasAnyRole("ADMINISTRADOR_SISTEMA", "SUPERVISOR_SST", "COORDINADOR_SST")
-
-                        // ── Solicitudes de reposición (fuera de alcance MVP) ────
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes-reposicion")
-                        .hasRole("JEFE_AREA")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/aprobar")
-                        .hasRole("SUPERVISOR_SST")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes-reposicion/*/rechazar")
-                        .hasRole("SUPERVISOR_SST")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes-reposicion/**")
-                        .hasAnyRole("JEFE_AREA", "SUPERVISOR_SST", "COORDINADOR_SST")
-
-                        // ── Todo lo demás requiere autenticación ─────────────────
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // ── Todo lo demás: requiere SUPERVISOR_SST o ADMINISTRADOR_SISTEMA ─
+                // Se usa una sola regla global para evitar inconsistencias.
+                // El @PreAuthorize en cada método puede añadir restricciones adicionales si fuera necesario.
+                .anyRequest().hasAnyRole(SUPERVISOR, ADMIN)
+            )
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
+        DaoAuthenticationProvider p = new DaoAuthenticationProvider();
+        p.setUserDetailsService(userDetailsService);
+        p.setPasswordEncoder(passwordEncoder());
+        return p;
     }
 
     @Bean
@@ -131,22 +94,22 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "http://localhost:5354",
-                "https://app.upeu.edu.pe",
                 "http://localhost:5000",
+                "https://app.upeu.edu.pe",
                 "http://10.0.2.2:8080",
                 "http://172.17.25.28:8080"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "PATCH", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }

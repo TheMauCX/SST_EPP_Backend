@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.epp.dto.request.AjusteInventarioDTO;
 import pe.edu.upeu.epp.dto.request.InventarioCentralRequestDTO;
 import pe.edu.upeu.epp.dto.request.InventarioCentralUpdateDTO;
+import pe.edu.upeu.epp.dto.response.InventarioAgrupadoResponseDTO;
 import pe.edu.upeu.epp.dto.response.InventarioCentralResponseDTO;
 import pe.edu.upeu.epp.entity.*;
 import pe.edu.upeu.epp.exception.BusinessException;
@@ -19,8 +20,7 @@ import pe.edu.upeu.epp.repository.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,35 +33,29 @@ public class InventarioCentralService {
     private final EstadoEppRepository estadoEppRepository;
     private final CatalogoTallaRepository tallaRepository;
 
+    // ── Crear ────────────────────────────────────────────────────────────────
+
     @Transactional
     public InventarioCentralResponseDTO crear(InventarioCentralRequestDTO request) {
         CatalogoEpp epp = catalogoEppRepository.findById(request.getEppId())
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + request.getEppId()));
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + request.getEppId()));
         EstadoEpp estado = estadoEppRepository.findById(request.getEstadoId())
-                .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado con ID: " + request.getEstadoId()));
+                .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado: " + request.getEstadoId()));
 
         CatalogoTalla talla = null;
         if (request.getTallaId() != null) {
             talla = tallaRepository.findById(request.getTallaId())
-                    .orElseThrow(() -> new EntityNotFoundException("Talla no encontrada con ID: " + request.getTallaId()));
+                    .orElseThrow(() -> new EntityNotFoundException("Talla no encontrada: " + request.getTallaId()));
         }
 
         boolean existe = talla != null
                 ? inventarioCentralRepository.existsByEppAndLoteAndEstadoAndTalla(epp, request.getLote(), estado, talla)
                 : inventarioCentralRepository.findByEppAndLoteAndEstadoSinTalla(epp, request.getLote(), estado).isPresent();
+        if (existe) throw new BusinessException("Ya existe un registro con esa combinación (EPP, lote, estado, talla).");
 
-        if (existe) {
-            throw new BusinessException(String.format(
-                    "Ya existe un registro para EPP '%s', Lote '%s', Estado '%s'%s",
-                    epp.getNombreEpp(), request.getLote(), estado.getNombre(),
-                    talla != null ? ", Talla '" + talla.getNombre() + "'" : " (sin talla)"));
-        }
-
-        InventarioCentral inventario = InventarioCentral.builder()
+        InventarioCentral inv = InventarioCentral.builder()
                 .epp(epp).estado(estado).talla(talla)
                 .cantidadActual(request.getCantidadActual())
-                .cantidadMinima(request.getCantidadMinima())
-                .cantidadMaxima(request.getCantidadMaxima())
                 .ubicacionBodega(request.getUbicacionBodega())
                 .lote(request.getLote())
                 .fechaAdquisicion(request.getFechaAdquisicion())
@@ -72,30 +66,24 @@ public class InventarioCentralService {
                 .fechaCreacion(LocalDateTime.now())
                 .build();
 
-        return mapToResponseDTO(inventarioCentralRepository.save(inventario));
+        return mapToResponseDTO(inventarioCentralRepository.save(inv));
     }
+
+    // ── Listar con filtros ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable, String sort, String filter) {
         boolean ordenAlfa     = "alpha".equalsIgnoreCase(sort);
         boolean soloStockBajo = "low_stock".equalsIgnoreCase(filter);
 
-        Pageable pageableEfectivo = pageable;
-        if (ordenAlfa) {
-            pageableEfectivo = PageRequest.of(
-                    pageable.getPageNumber(), pageable.getPageSize(),
-                    Sort.by("epp.nombreEpp").ascending());
-        }
+        Pageable efectivo = ordenAlfa
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                        Sort.by("epp.nombreEpp").ascending())
+                : pageable;
 
-        if (soloStockBajo && ordenAlfa) {
-            return inventarioCentralRepository.findStockBajoPaginado(pageableEfectivo).map(this::mapToResponseDTO);
-        } else if (soloStockBajo) {
-            return inventarioCentralRepository.findStockBajoPaginado(pageable).map(this::mapToResponseDTO);
-        } else if (ordenAlfa) {
-            return inventarioCentralRepository.findAllOrderByNombreEppAsc(pageableEfectivo).map(this::mapToResponseDTO);
-        } else {
-            return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
-        }
+        if (soloStockBajo) return inventarioCentralRepository.findStockBajoPaginado(efectivo).map(this::mapToResponseDTO);
+        if (ordenAlfa)     return inventarioCentralRepository.findAllOrderByNombreEppAsc(efectivo).map(this::mapToResponseDTO);
+        return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
     }
 
     @Transactional(readOnly = true)
@@ -103,61 +91,82 @@ public class InventarioCentralService {
         return listarTodos(pageable, null, null);
     }
 
-    @Transactional
-    public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
-        InventarioCentral inventarioActual = inventarioCentralRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
+    // ── Vista agrupada (EPP + proveedor + lote) ───────────────────────────────
 
-        String nuevoLote = request.getLote() != null ? request.getLote() : inventarioActual.getLote();
-        EstadoEpp nuevoEstado = inventarioActual.getEstado();
-        if (request.getEstadoId() != null) {
-            nuevoEstado = estadoEppRepository.findById(request.getEstadoId())
-                    .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado: " + request.getEstadoId()));
-        }
+    /**
+     * Devuelve una lista donde cada elemento agrupa todos los registros del
+     * inventario central que comparten (epp_id, proveedor, lote).
+     * Dentro de cada grupo, se listan las tallas con sus cantidades y precios.
+     */
+    @Transactional(readOnly = true)
+    public List<InventarioAgrupadoResponseDTO> listarAgrupado() {
+        List<InventarioCentral> todos = inventarioCentralRepository.findAll();
 
-        boolean hayCambiosClave = !nuevoLote.equals(inventarioActual.getLote())
-                || !nuevoEstado.getEstadoId().equals(inventarioActual.getEstado().getEstadoId());
+        // Agrupar por (eppId, proveedor, lote)
+        Map<String, List<InventarioCentral>> grupos = todos.stream()
+                .collect(Collectors.groupingBy(inv ->
+                        inv.getEpp().getEppId()
+                        + "||" + Objects.toString(inv.getProveedor(), "")
+                        + "||" + Objects.toString(inv.getLote(), "")
+                ));
 
-        if (hayCambiosClave) {
-            CatalogoTalla tallaActual = inventarioActual.getTalla();
-            Optional<InventarioCentral> registroExistente = tallaActual != null
-                    ? inventarioCentralRepository.findByEppAndLoteAndEstadoAndTalla(
-                            inventarioActual.getEpp(), nuevoLote, nuevoEstado, tallaActual)
-                    : inventarioCentralRepository.findByEppAndLoteAndEstadoSinTalla(
-                            inventarioActual.getEpp(), nuevoLote, nuevoEstado);
+        return grupos.values().stream()
+                .map(registros -> {
+                    InventarioCentral primero = registros.get(0);
+                    CatalogoEpp epp = primero.getEpp();
 
-            if (registroExistente.isPresent() && !registroExistente.get().getInventarioCentralId().equals(id)) {
-                InventarioCentral destino = registroExistente.get();
-                destino.setCantidadActual(destino.getCantidadActual() + inventarioActual.getCantidadActual());
-                if (request.getCantidadMinima() != null) destino.setCantidadMinima(request.getCantidadMinima());
-                if (request.getCantidadMaxima() != null) destino.setCantidadMaxima(request.getCantidadMaxima());
-                if (request.getUbicacionBodega() != null) destino.setUbicacionBodega(request.getUbicacionBodega());
-                InventarioCentral consolidado = inventarioCentralRepository.save(destino);
-                inventarioCentralRepository.delete(inventarioActual);
-                return mapToResponseDTO(consolidado);
-            }
-        }
+                    int totalCantidad = registros.stream()
+                            .mapToInt(r -> r.getCantidadActual() != null ? r.getCantidadActual() : 0)
+                            .sum();
 
-        if (request.getEstadoId() != null)    inventarioActual.setEstado(nuevoEstado);
-        if (request.getLote() != null)         inventarioActual.setLote(nuevoLote);
-        if (request.getCantidadMinima() != null) inventarioActual.setCantidadMinima(request.getCantidadMinima());
-        if (request.getCantidadMaxima() != null) inventarioActual.setCantidadMaxima(request.getCantidadMaxima());
-        if (request.getUbicacionBodega() != null) inventarioActual.setUbicacionBodega(request.getUbicacionBodega());
-        if (request.getObservaciones() != null) inventarioActual.setObservaciones(request.getObservaciones());
+                    List<InventarioAgrupadoResponseDTO.DetalleTallaDTO> detalles = registros.stream()
+                            .map(r -> InventarioAgrupadoResponseDTO.DetalleTallaDTO.builder()
+                                    .inventarioId(r.getInventarioCentralId())
+                                    .tallaId(r.getTalla() != null ? r.getTalla().getTallaId() : null)
+                                    .tallaNombre(r.getTalla() != null ? r.getTalla().getNombre() : "Sin talla")
+                                    .cantidadActual(r.getCantidadActual())
+                                    .costoUnitario(r.getCostoUnitario())
+                                    .estadoNombre(r.getEstado() != null ? r.getEstado().getNombre() : null)
+                                    .build())
+                            .sorted(Comparator.comparing(
+                                    d -> d.getTallaNombre() != null ? d.getTallaNombre() : ""))
+                            .collect(Collectors.toList());
 
-        return mapToResponseDTO(inventarioCentralRepository.save(inventarioActual));
+                    boolean necesita = epp.getCantidadMinima() != null
+                            && totalCantidad <= epp.getCantidadMinima();
+
+                    return InventarioAgrupadoResponseDTO.builder()
+                            .eppId(epp.getEppId())
+                            .eppNombre(epp.getNombreEpp())
+                            .tipoUso(epp.getTipoUso())
+                            .color(epp.getColor())
+                            .lote(primero.getLote())
+                            .proveedor(primero.getProveedor())
+                            .fechaAdquisicion(primero.getFechaAdquisicion())
+                            .fechaVencimiento(primero.getFechaVencimiento())
+                            .totalCantidad(totalCantidad)
+                            .cantidadMinima(epp.getCantidadMinima())
+                            .cantidadMaxima(epp.getCantidadMaxima())
+                            .necesitaReposicion(necesita)
+                            .detallesPorTalla(detalles)
+                            .build();
+                })
+                .sorted(Comparator.comparing(InventarioAgrupadoResponseDTO::getEppNombre))
+                .collect(Collectors.toList());
     }
+
+    // ── Consultas estándar ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public InventarioCentralResponseDTO obtenerPorId(Integer id) {
         return mapToResponseDTO(inventarioCentralRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id)));
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id)));
     }
 
     @Transactional(readOnly = true)
     public List<InventarioCentralResponseDTO> listarPorEpp(Integer eppId) {
         CatalogoEpp epp = catalogoEppRepository.findById(eppId)
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + eppId));
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + eppId));
         return inventarioCentralRepository.findByEpp(epp).stream()
                 .map(this::mapToResponseDTO).collect(Collectors.toList());
     }
@@ -175,51 +184,66 @@ public class InventarioCentralService {
     }
 
     @Transactional
+    public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
+        InventarioCentral inv = inventarioCentralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id));
+
+        if (request.getEstadoId() != null) {
+            inv.setEstado(estadoEppRepository.findById(request.getEstadoId())
+                    .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado")));
+        }
+        if (request.getLote() != null)          inv.setLote(request.getLote());
+        if (request.getUbicacionBodega() != null) inv.setUbicacionBodega(request.getUbicacionBodega());
+        if (request.getObservaciones() != null)  inv.setObservaciones(request.getObservaciones());
+
+        return mapToResponseDTO(inventarioCentralRepository.save(inv));
+    }
+
+    @Transactional
     public InventarioCentralResponseDTO ajustarStock(Integer id, AjusteInventarioDTO request) {
-        InventarioCentral inventario = inventarioCentralRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
+        InventarioCentral inv = inventarioCentralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id));
 
         int ajuste = "SALIDA".equals(request.getTipoAjuste())
                 ? -request.getCantidadAjuste()
                 : request.getCantidadAjuste();
 
-        int nuevaCantidad = inventario.getCantidadActual() + ajuste;
-        if (nuevaCantidad < 0) throw new BusinessException("El ajuste resultaría en cantidad negativa.");
+        int nueva = inv.getCantidadActual() + ajuste;
+        if (nueva < 0) throw new BusinessException("El ajuste resultaría en cantidad negativa.");
 
-        inventario.setCantidadActual(nuevaCantidad);
-        inventario.setObservaciones(String.format("[AJUSTE %s] %d unidades. Motivo: %s",
+        inv.setCantidadActual(nueva);
+        inv.setObservaciones(String.format("[AJUSTE %s] %d uds. Motivo: %s",
                 request.getTipoAjuste(), Math.abs(ajuste), request.getMotivo()));
-        return mapToResponseDTO(inventarioCentralRepository.save(inventario));
+        return mapToResponseDTO(inventarioCentralRepository.save(inv));
     }
 
     @Transactional
     public void eliminar(Integer id) {
-        InventarioCentral inventario = inventarioCentralRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado con ID: " + id));
-        if (inventario.getCantidadActual() > 0)
+        InventarioCentral inv = inventarioCentralRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id));
+        if (inv.getCantidadActual() > 0)
             throw new BusinessException("No se puede eliminar inventario con stock disponible.");
-        inventarioCentralRepository.delete(inventario);
+        inventarioCentralRepository.delete(inv);
     }
 
-    // ── Mapeo (ahora incluye talla) ───────────────────────────────────────
+    // ── Mapeo ─────────────────────────────────────────────────────────────────
 
     private InventarioCentralResponseDTO mapToResponseDTO(InventarioCentral inv) {
+        CatalogoEpp epp = inv.getEpp();
         return InventarioCentralResponseDTO.builder()
                 .inventarioId(inv.getInventarioCentralId())
-                .eppId(inv.getEpp().getEppId())
-                .eppNombre(inv.getEpp().getNombreEpp())
-                .eppCodigoIdentificacion(null)
-                .tipoUso(inv.getEpp().getTipoUso())
+                .eppId(epp.getEppId())
+                .eppNombre(epp.getNombreEpp())
+                .tipoUso(epp.getTipoUso())
                 .tallaId(inv.getTalla() != null ? inv.getTalla().getTallaId() : null)
                 .tallaNombre(inv.getTalla() != null ? inv.getTalla().getNombre() : null)
                 .estadoId(inv.getEstado().getEstadoId())
                 .estadoNombre(inv.getEstado().getNombre())
-                .estadoDescripcion(inv.getEstado().getDescripcion())
                 .estadoPermiteUso(inv.getEstado().getPermiteUso())
                 .estadoColorHex(inv.getEstado().getColorHex())
                 .cantidadActual(inv.getCantidadActual())
-                .cantidadMinima(inv.getCantidadMinima())
-                .cantidadMaxima(inv.getCantidadMaxima())
+                .cantidadMinima(epp.getCantidadMinima())
+                .cantidadMaxima(epp.getCantidadMaxima())
                 .ubicacionBodega(inv.getUbicacionBodega())
                 .lote(inv.getLote())
                 .fechaAdquisicion(inv.getFechaAdquisicion())

@@ -24,56 +24,53 @@ import java.util.Map;
 @RequestMapping("/api/v1/compras")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Compras", description = "Gestión de compras e ingresos directos a Inventario Central")
+@Tag(name = "Compras", description = "Registro de compras con factura y cotización opcional")
 @SecurityRequirement(name = "Bearer Authentication")
 public class CompraController {
 
     private final CompraService compraService;
 
+    /**
+     * Registra una compra.
+     *
+     * Multipart keys:
+     *   compraData        → JSON obligatorio
+     *   facturaArchivo    → archivo de factura (opcional)
+     *   cotizacionArchivo → archivo de cotización (opcional, sprint 4b)
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Registrar nueva compra", description = "Registra una factura, sube el archivo PDF/JPG, y suma automáticamente el stock al Inventario Central.")
+    @Operation(
+            summary = "Registrar compra",
+            description = "Registra una factura, actualiza el inventario central. " +
+                    "Acepta opcionalmente el archivo de factura y/o cotización.")
     public ResponseEntity<?> registrarCompra(
             @RequestPart("compraData") String compraDataJson,
-            @RequestPart(value = "facturaArchivo", required = false) MultipartFile facturaArchivo,
+            @RequestPart(value = "facturaArchivo",    required = false) MultipartFile facturaArchivo,
+            @RequestPart(value = "cotizacionArchivo", required = false) MultipartFile cotizacionArchivo,
             Authentication authentication) {
 
-        log.info("====== INICIANDO ENDPOINT DE COMPRAS ======");
-        log.info("JSON Recibido: {}", compraDataJson);
-
-        // DEBUG DEL ARCHIVO
-        if (facturaArchivo == null) {
-            log.warn("⚠️ ALERTA: El parámetro 'facturaArchivo' llegó como NULL. Verifica el nombre de la Key en Postman.");
-        } else if (facturaArchivo.isEmpty()) {
-            log.warn("⚠️ ALERTA: El archivo llegó pero pesa 0 bytes.");
-        } else {
-            log.info("✅ Archivo recibido correctamente. Nombre: {}, Tamaño: {} bytes",
-                    facturaArchivo.getOriginalFilename(), facturaArchivo.getSize());
-        }
-
+        log.info("POST /compras — usuario: {}", authentication.getName());
         try {
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             CompraRequestDTO requestDTO = mapper.readValue(compraDataJson, CompraRequestDTO.class);
 
-            String username = authentication.getName();
-            log.info("Usuario autenticado: {}", username);
+            Compra compra = compraService.registrarCompra(
+                    requestDTO, facturaArchivo, cotizacionArchivo, authentication.getName());
 
-            Compra compraGuardada = compraService.registrarCompra(requestDTO, facturaArchivo, username);
-
-            log.info("====== COMPRA EXITOSA ID: {} ======", compraGuardada.getCompraId());
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    Map.of(
-                            "mensaje", "Compra registrada e inventario actualizado exitosamente",
-                            "compraId", compraGuardada.getCompraId(),
-                            "urlFactura", compraGuardada.getRutaArchivoFactura() != null ? compraGuardada.getRutaArchivoFactura() : "No se subió archivo",
-                            "totalGastado", compraGuardada.getMontoTotal()
-                    )
-            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                    "mensaje",       "Compra registrada e inventario actualizado exitosamente",
+                    "compraId",      compra.getCompraId(),
+                    "urlFactura",    compra.getRutaArchivoFactura()   != null ? compra.getRutaArchivoFactura()   : "No se subió factura",
+                    "urlCotizacion", compra.getRutaArchivoCotizacion() != null ? compra.getRutaArchivoCotizacion() : "No se subió cotización",
+                    "subtotal",      compra.getSubtotal(),
+                    "igv",           compra.getIgv(),
+                    "totalGastado",  compra.getMontoTotal()
+            ));
         } catch (Exception e) {
-            log.error("❌ ERROR EN EL CONTROLADOR DE COMPRAS: ", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+            log.error("Error en registro de compra: ", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

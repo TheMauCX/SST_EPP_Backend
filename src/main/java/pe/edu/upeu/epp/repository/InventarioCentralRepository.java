@@ -54,7 +54,7 @@ public interface InventarioCentralRepository extends JpaRepository<InventarioCen
     // ── Stock bajo ───────────────────────────────────────────────────────
 
     @Query("SELECT ic FROM InventarioCentral ic " +
-           "WHERE ic.cantidadActual <= ic.cantidadMinima ORDER BY ic.epp.nombreEpp")
+            "WHERE ic.cantidadActual <= ic.epp.cantidadMinima ORDER BY ic.epp.nombreEpp")
     List<InventarioCentral> findStockBajo();
 
     // ── Vencimiento ──────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ public interface InventarioCentralRepository extends JpaRepository<InventarioCen
     // ── HU-24: Inventario central filtrado por bajo stock ────────────────
 
     @Query("SELECT ic FROM InventarioCentral ic " +
-           "WHERE ic.cantidadActual <= ic.cantidadMinima ORDER BY ic.epp.nombreEpp ASC")
+            "WHERE ic.cantidadActual <= ic.epp.cantidadMinima ORDER BY ic.epp.nombreEpp ASC")
     Page<InventarioCentral> findStockBajoPaginado(Pageable pageable);
 
     // ── HU-14: Reporte de gastos — suma de entregas por mes ─────────────

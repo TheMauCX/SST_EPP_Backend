@@ -1,6 +1,7 @@
 package pe.edu.upeu.epp.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
@@ -12,12 +13,9 @@ import java.util.Set;
 /**
  * Catálogo de tipos de EPP.
  *
- * Sprint 4 — cambios:
- *   - Se agrega campo 'color' (HU-17)
- *   - Se agrega relación Many-to-Many con CatalogoTalla (HU-17)
- *   - Se agrega campo 'ficha_tecnica_path' para PDF en Azure (HU-19)
- *
- * Hibernate aplica los cambios con ddl-auto=update (ALTER TABLE).
+ * Sprint 4b:
+ *   - cantidadMinima y cantidadMaxima se mueven aquí desde InventarioCentral/InventarioArea.
+ *     Son umbrales de alerta de stock propios del tipo de EPP, no del lote/área.
  */
 @Entity
 @Table(name = "catalogo_epp", schema = "epp", indexes = {
@@ -37,7 +35,7 @@ public class CatalogoEpp {
     @Column(name = "nombre_epp", nullable = false, length = 100)
     private String nombreEpp;
 
-    // ── Campos de Ficha Técnica ──────────────────────────────────────────
+    // ── Ficha Técnica ────────────────────────────────────────────────────────
 
     @Column(name = "aprobaciones_normas", length = 255)
     private String aprobacionesNormas;
@@ -63,38 +61,36 @@ public class CatalogoEpp {
     @Column(name = "condiciones_cambio_prematuro", columnDefinition = "TEXT")
     private String condicionesCambioPrematuro;
 
-    /** URL pública de la foto de referencia en Azure Blob Storage */
     @Column(name = "foto_referencia", length = 500)
     private String fotoReferencia;
 
-    // ── Sprint 4: nuevos campos ──────────────────────────────────────────
-
-    /**
-     * Color del EPP. Ej: "Naranja", "Amarillo reflectivo", "Blanco".
-     * Campo de texto libre porque los colores de EPP son descriptivos,
-     * no necesitan tabla maestra.
-     * HU-17
-     */
-    @Column(name = "color", length = 60)
-    private String color;
-
-    /**
-     * Ruta/URL del archivo PDF de ficha técnica en Azure Blob Storage.
-     * Almacena la URL pública del blob, no el contenido binario.
-     * Ejemplo: https://account.blob.core.windows.net/media/epps/fichas/12-ficha.pdf
-     * HU-19
-     */
     @Column(name = "ficha_tecnica_path", length = 500)
     private String fichaTecnicaPath;
 
+    @Column(name = "color", length = 60)
+    private String color;
+
+    // ── Umbrales de stock (antes estaban en inventario_central e inventario_area) ─
+
     /**
-     * Tallas disponibles para este EPP.
-     * Relación Many-to-Many con tabla maestra CatalogoTalla.
-     * La tabla de unión 'epp_talla' se crea automáticamente con Hibernate.
-     * Si el EPP no maneja tallas (ej. guantes de nitrilo caja x100),
-     * la colección queda vacía y se usa talla "UNICA" en inventario.
-     * HU-17
+     * Cantidad mínima de alerta para este tipo de EPP.
+     * Si el stock en central o área cae a este nivel, se activa la alerta.
+     * Sprint 4b: migrado desde inventario_central / inventario_area.
      */
+    @Min(0)
+    @Column(name = "cantidad_minima", nullable = false)
+    private Integer cantidadMinima = 0;
+
+    /**
+     * Cantidad máxima recomendada en stock para este tipo de EPP.
+     * Opcional; se usa para calcular el porcentaje de stock.
+     */
+    @Min(0)
+    @Column(name = "cantidad_maxima")
+    private Integer cantidadMaxima;
+
+    // ── Tallas disponibles ───────────────────────────────────────────────────
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "epp_talla",
@@ -105,7 +101,7 @@ public class CatalogoEpp {
     @Builder.Default
     private Set<CatalogoTalla> tallasDisponibles = new HashSet<>();
 
-    // ── Auditoría y estado ───────────────────────────────────────────────
+    // ── Auditoría ────────────────────────────────────────────────────────────
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
@@ -123,9 +119,10 @@ public class CatalogoEpp {
 
     @PrePersist
     protected void onCreate() {
-        fechaCreacion     = LocalDateTime.now();
+        fechaCreacion      = LocalDateTime.now();
         fechaActualizacion = LocalDateTime.now();
         if (activo == null) activo = true;
+        if (cantidadMinima == null) cantidadMinima = 0;
     }
 
     @PreUpdate
@@ -133,7 +130,5 @@ public class CatalogoEpp {
         fechaActualizacion = LocalDateTime.now();
     }
 
-    public enum TipoUso {
-        CONSUMIBLE, DURADERO
-    }
+    public enum TipoUso { CONSUMIBLE, DURADERO }
 }

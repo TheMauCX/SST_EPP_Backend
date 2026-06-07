@@ -23,11 +23,11 @@ import java.util.UUID;
 /**
  * Servicio de entregas de EPP.
  *
- * Fix (tallas):
- *   Al descontar del inventario de área se usa el tallaId del ItemEntregaDTO
- *   para buscar el registro exacto (EPP + área + estado + talla).
- *   Sin esto, si el área tiene 10 cascos-M y 8 cascos-L, entregar "1 casco-M"
- *   podría descontar del primer registro que encuentre sin importar la talla.
+ * Sprint 4b:
+ *   - Se elimina el concepto de "jefe de área".
+ *   - El supervisor que registra la entrega se obtiene del token JWT.
+ *   - El área de descuento se deriva del área del trabajador receptor (Opción B).
+ *   - El supervisor no está restringido a ningún área.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,256 +44,220 @@ public class EntregaEppService {
     private final EstadoEppRepository estadoEppRepository;
 
     @Transactional
-    public EntregaEppResponseDTO registrarEntregaEpp(EntregaEppRequestDTO entregaEppRequestDTO,
-                                                      String username) {
+    public EntregaEppResponseDTO registrarEntregaEpp(EntregaEppRequestDTO request, String username) {
 
-        Usuario jefeAreaUsuario = usuarioRepository.findByNombreUsuario(username)
+        // Supervisor: usuario autenticado (no necesita estar ligado a un área)
+        Usuario supervisor = usuarioRepository.findByNombreUsuario(username)
                 .orElseThrow(() -> new BusinessException("Usuario no encontrado: " + username));
 
-        Area areaDelJefe = jefeAreaUsuario.getTrabajador() != null
-                ? jefeAreaUsuario.getTrabajador().getArea()
-                : null;
+        // Trabajador receptor: su área determina de dónde se descuenta el stock
+        Trabajador trabajador = trabajadorRepository.findById(request.getTrabajadorId())
+                .orElseThrow(() -> new BusinessException(
+                        "Trabajador no encontrado con ID: " + request.getTrabajadorId()));
 
-        if (areaDelJefe == null) {
-            throw new BusinessException("El usuario '" + username +
-                    "' no está asignado a un área y no puede descontar stock.");
+        Area areaTrabajador = trabajador.getArea();
+        if (areaTrabajador == null) {
+            throw new BusinessException("El trabajador ID=" + request.getTrabajadorId()
+                    + " no tiene área asignada.");
         }
 
-        Trabajador trabajador = trabajadorRepository.findById(entregaEppRequestDTO.getTrabajadorId())
-                .orElseThrow(() -> new BusinessException(
-                        "Trabajador no encontrado con ID: " + entregaEppRequestDTO.getTrabajadorId()));
-
         EntregaEpp entrega = new EntregaEpp();
-        entrega.setJefeArea(jefeAreaUsuario);
+        entrega.setSupervisorUsuario(supervisor);
         entrega.setTrabajador(trabajador);
         entrega.setFechaEntrega(LocalDateTime.now());
-        entrega.setTipoEntrega(entregaEppRequestDTO.getTipoEntrega());
-        entrega.setObservaciones(entregaEppRequestDTO.getObservaciones());
+        entrega.setTipoEntrega(request.getTipoEntrega());
+        entrega.setObservaciones(request.getObservaciones());
 
         EntregaEpp entregaGuardada = entregaEppRepository.save(entrega);
-        List<DetalleEntregaDTO> detallesRespuestaDTO = new ArrayList<>();
+        List<DetalleEntregaDTO> detallesDTO = new ArrayList<>();
 
-        for (ItemEntregaDTO item : entregaEppRequestDTO.getItems()) {
+        for (ItemEntregaDTO item : request.getItems()) {
+            CatalogoEpp epp = catalogoEppRepository.findById(item.getEppId())
+                    .orElseThrow(() -> new BusinessException("EPP no encontrado: " + item.getEppId()));
 
-            CatalogoEpp catalogoEpp = catalogoEppRepository.findById(item.getEppId())
-                    .orElseThrow(() -> new BusinessException(
-                            "EPP no encontrado con ID: " + item.getEppId()));
+            EstadoEpp estado = estadoEppRepository.findByNombre(item.getEstadoNombre())
+                    .orElseThrow(() -> new BusinessException("Estado '" + item.getEstadoNombre() + "' no configurado."));
 
-            // Resolver estado
-            EstadoEpp estadoDelItem = estadoEppRepository.findByNombre(item.getEstadoNombre())
-                    .orElseThrow(() -> new BusinessException(
-                            "Estado '" + item.getEstadoNombre() + "' no está configurado."));
-
-            // Resolver talla (puede ser null)
-            CatalogoTalla tallaDelItem = null;
+            CatalogoTalla talla = null;
             if (item.getTallaId() != null) {
-                tallaDelItem = tallaRepository.findById(item.getTallaId())
-                        .orElseThrow(() -> new BusinessException(
-                                "Talla no encontrada con ID: " + item.getTallaId()));
+                talla = tallaRepository.findById(item.getTallaId())
+                        .orElseThrow(() -> new BusinessException("Talla no encontrada: " + item.getTallaId()));
             }
 
-            // Buscar el registro de inventario del área con la talla correcta
-            InventarioArea inventarioArea = buscarInventarioArea(
-                    catalogoEpp, areaDelJefe, estadoDelItem, tallaDelItem);
+            // Buscar stock en el área del trabajador
+            InventarioArea invArea = buscarInventarioArea(epp, areaTrabajador, estado, talla);
 
-            // Validar stock
-            if (inventarioArea.getCantidadActual() < item.getCantidad()) {
+            if (invArea.getCantidadActual() < item.getCantidad()) {
                 throw new BusinessException(String.format(
-                        "Stock insuficiente para '%s'%s. Solicitado: %d, Disponible: %d.",
-                        catalogoEpp.getNombreEpp(),
-                        tallaDelItem != null ? " talla " + tallaDelItem.getNombre() : "",
-                        item.getCantidad(),
-                        inventarioArea.getCantidadActual()));
+                        "Stock insuficiente para '%s'%s en área '%s'. Disponible: %d, Solicitado: %d.",
+                        epp.getNombreEpp(),
+                        talla != null ? " talla " + talla.getNombre() : "",
+                        areaTrabajador.getNombreArea(),
+                        invArea.getCantidadActual(), item.getCantidad()));
             }
 
-            // Descontar stock del área
-            inventarioArea.setCantidadActual(inventarioArea.getCantidadActual() - item.getCantidad());
-            inventarioAreaRepository.save(inventarioArea);
+            invArea.setCantidadActual(invArea.getCantidadActual() - item.getCantidad());
+            inventarioAreaRepository.save(invArea);
 
-            // Crear detalle de entrega (con talla)
             DetalleEntregaEpp detalle = new DetalleEntregaEpp();
             detalle.setEntrega(entregaGuardada);
-            detalle.setEpp(catalogoEpp);
-            detalle.setTalla(tallaDelItem);
+            detalle.setEpp(epp);
+            detalle.setTalla(talla);
             detalle.setCantidad(item.getCantidad());
             detalle.setMotivo(item.getMotivo());
             DetalleEntregaEpp detalleGuardado = detalleEntregaEppRepository.save(detalle);
 
-            // Para DURADEROS crear instancias individuales
-            if (catalogoEpp.getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
+            if (epp.getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
                 for (int i = 0; i < item.getCantidad(); i++) {
-                    InstanciaEpp instancia = new InstanciaEpp();
-                    instancia.setDetalleEntrega(detalleGuardado);
-                    instancia.setEpp(catalogoEpp);
-                    instancia.setEstado(estadoDelItem);
-                    instancia.setTrabajadorActual(trabajador);
-                    instancia.setAreaActual(trabajador.getArea());
-                    instancia.setCodigoSerie(UUID.randomUUID().toString());
-                    instancia.setFechaAdquisicion(LocalDate.now());
-                    detallesRespuestaDTO.add(
-                            convertirInstanciaADetalleDTO(instanciaEppRepository.save(instancia)));
+                    InstanciaEpp inst = new InstanciaEpp();
+                    inst.setDetalleEntrega(detalleGuardado);
+                    inst.setEpp(epp);
+                    inst.setEstado(estado);
+                    inst.setTrabajadorActual(trabajador);
+                    inst.setAreaActual(areaTrabajador);
+                    inst.setCodigoSerie(UUID.randomUUID().toString());
+                    inst.setFechaAdquisicion(LocalDate.now());
+                    detallesDTO.add(convertirInstancia(instanciaEppRepository.save(inst)));
                 }
             } else {
-                detallesRespuestaDTO.add(convertirDetalleConsumibleADetalleDTO(detalleGuardado));
+                detallesDTO.add(convertirDetalle(detalleGuardado));
             }
         }
 
-        return convertirAEntregaResponseDTO(entregaGuardada, detallesRespuestaDTO);
+        return toResponseDTO(entregaGuardada, detallesDTO);
     }
 
-    /**
-     * Busca el registro de inventario de área con la combinación correcta.
-     * Con talla:  findByEppAndAreaAndEstadoAndTalla
-     * Sin talla:  findByEppAndAreaAndEstadoSinTalla
-     */
-    private InventarioArea buscarInventarioArea(CatalogoEpp epp,
-                                                Area area,
-                                                EstadoEpp estado,
-                                                CatalogoTalla talla) {
+    private InventarioArea buscarInventarioArea(CatalogoEpp epp, Area area,
+                                                EstadoEpp estado, CatalogoTalla talla) {
         if (talla != null) {
             return inventarioAreaRepository
                     .findByEppAndAreaAndEstadoAndTalla(epp, area, estado, talla)
                     .orElseThrow(() -> new BusinessException(String.format(
-                            "Stock '%s' no encontrado para '%s' talla '%s' en área '%s'.",
+                            "Sin stock '%s' para '%s' talla '%s' en área '%s'.",
                             estado.getNombre(), epp.getNombreEpp(),
                             talla.getNombre(), area.getNombreArea())));
-        } else {
-            return inventarioAreaRepository
-                    .findByEppAndAreaAndEstadoSinTalla(epp, area, estado)
-                    .orElseThrow(() -> new BusinessException(String.format(
-                            "Stock '%s' no encontrado para '%s' en área '%s'.",
-                            estado.getNombre(), epp.getNombreEpp(), area.getNombreArea())));
         }
+        return inventarioAreaRepository
+                .findByEppAndAreaAndEstadoSinTalla(epp, area, estado)
+                .orElseThrow(() -> new BusinessException(String.format(
+                        "Sin stock '%s' para '%s' en área '%s'.",
+                        estado.getNombre(), epp.getNombreEpp(), area.getNombreArea())));
     }
 
-    // ── Consultas ──────────────────────────────────────────────────────────
+    // ── Consultas ──────────────────────────────────────────────────────────────
 
     public Page<EntregaEppResponseDTO> findAllEntregas(Pageable pageable) {
-        return entregaEppRepository.findAll(pageable).map(this::convertirAEntregaResponseDTO);
+        return entregaEppRepository.findAll(pageable).map(this::toResponseDTO);
     }
 
     public EntregaDetalleResponseDTO findEntregaById(Integer id) {
-        EntregaEpp entregaEpp = entregaEppRepository.findById(id)
-                .orElseThrow(() -> new BusinessException("Entrega no encontrada con ID: " + id));
+        EntregaEpp entrega = entregaEppRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Entrega no encontrada: " + id));
 
-        List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entregaEpp);
-        List<DetalleEntregaDTO> detallesDTO = new ArrayList<>();
-
-        for (DetalleEntregaEpp detalle : detalles) {
-            if (detalle.getEpp().getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
-                instanciaEppRepository.findByDetalleEntrega(detalle)
-                        .forEach(i -> detallesDTO.add(convertirInstanciaADetalleDTO(i)));
+        List<DetalleEntregaDTO> detalles = new ArrayList<>();
+        for (DetalleEntregaEpp d : detalleEntregaEppRepository.findByEntrega(entrega)) {
+            if (d.getEpp().getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
+                instanciaEppRepository.findByDetalleEntrega(d).forEach(i -> detalles.add(convertirInstancia(i)));
             } else {
-                detallesDTO.add(convertirDetalleConsumibleADetalleDTO(detalle));
+                detalles.add(convertirDetalle(d));
             }
         }
 
-        Trabajador trabajador = entregaEpp.getTrabajador();
-        Usuario jefeArea = entregaEpp.getJefeArea();
-        String jefeAreaNombre = resolverNombreJefe(jefeArea);
-        Integer jefeAreaId = jefeArea != null ? jefeArea.getUsuarioId() : null;
-        int totalItems = detallesDTO.stream().mapToInt(d -> d.getCantidad() != null ? d.getCantidad() : 0).sum();
+        int total = detalles.stream().mapToInt(d -> d.getCantidad() != null ? d.getCantidad() : 0).sum();
 
         return EntregaDetalleResponseDTO.builder()
-                .entregaId(entregaEpp.getEntregaId())
-                .trabajadorId(trabajador.getTrabajadorId())
-                .trabajadorNombre(trabajador.getNombres() + " " + trabajador.getApellidos())
-                .trabajadorDni(trabajador.getDni())
-                .trabajadorArea(trabajador.getArea() != null ? trabajador.getArea().getNombreArea() : null)
-                .trabajadorPuesto(trabajador.getCargo())
-                .jefeAreaId(jefeAreaId)
-                .jefeAreaNombre(jefeAreaNombre)
-                .fechaEntrega(entregaEpp.getFechaEntrega())
-                .tipoEntrega(entregaEpp.getTipoEntrega())
-                .observaciones(entregaEpp.getObservaciones())
-                .status(entregaEpp.getStatus())
-                .items(detallesDTO)
-                .totalItems(totalItems)
+                .entregaId(entrega.getEntregaId())
+                .trabajadorId(entrega.getTrabajador().getTrabajadorId())
+                .trabajadorNombre(entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos())
+                .trabajadorDni(entrega.getTrabajador().getDni())
+                .trabajadorArea(entrega.getTrabajador().getArea() != null ? entrega.getTrabajador().getArea().getNombreArea() : null)
+                .trabajadorPuesto(entrega.getTrabajador().getCargo())
+                .supervisorId(entrega.getSupervisorUsuario() != null ? entrega.getSupervisorUsuario().getUsuarioId() : null)
+                .supervisorNombre(resolverNombreSupervisor(entrega.getSupervisorUsuario()))
+                .fechaEntrega(entrega.getFechaEntrega())
+                .tipoEntrega(entrega.getTipoEntrega())
+                .observaciones(entrega.getObservaciones())
+                .status(entrega.getStatus())
+                .items(detalles)
+                .totalItems(total)
                 .build();
     }
 
     public Page<EntregaEppResponseDTO> findEntregasByTrabajadorId(Integer trabajadorId, Pageable pageable) {
         Trabajador t = trabajadorRepository.findById(trabajadorId)
-                .orElseThrow(() -> new BusinessException("Trabajador no encontrado con ID: " + trabajadorId));
-        return entregaEppRepository.findByTrabajador(t, pageable).map(this::convertirAEntregaResponseDTO);
+                .orElseThrow(() -> new BusinessException("Trabajador no encontrado: " + trabajadorId));
+        return entregaEppRepository.findByTrabajador(t, pageable).map(this::toResponseDTO);
     }
 
     public Page<EntregaEppResponseDTO> findEntregasByTrabajadorDni(String dni, Pageable pageable) {
         Trabajador t = trabajadorRepository.findByDni(dni)
                 .orElseThrow(() -> new BusinessException("Trabajador no encontrado con DNI: " + dni));
-        return entregaEppRepository.findByTrabajador(t, pageable).map(this::convertirAEntregaResponseDTO);
+        return entregaEppRepository.findByTrabajador(t, pageable).map(this::toResponseDTO);
     }
 
-    // ── Mapeo interno ──────────────────────────────────────────────────────
+    // ── Mapeo ─────────────────────────────────────────────────────────────────
 
-    private EntregaEppResponseDTO convertirAEntregaResponseDTO(EntregaEpp entrega) {
-        List<DetalleEntregaEpp> detalles = detalleEntregaEppRepository.findByEntrega(entrega);
-        List<DetalleEntregaDTO> detallesDTO = new ArrayList<>();
-        for (DetalleEntregaEpp d : detalles) {
+    private EntregaEppResponseDTO toResponseDTO(EntregaEpp entrega) {
+        List<DetalleEntregaDTO> detalles = new ArrayList<>();
+        for (DetalleEntregaEpp d : detalleEntregaEppRepository.findByEntrega(entrega)) {
             if (d.getEpp().getTipoUso() == CatalogoEpp.TipoUso.DURADERO) {
-                instanciaEppRepository.findByDetalleEntrega(d)
-                        .forEach(i -> detallesDTO.add(convertirInstanciaADetalleDTO(i)));
+                instanciaEppRepository.findByDetalleEntrega(d).forEach(i -> detalles.add(convertirInstancia(i)));
             } else {
-                detallesDTO.add(convertirDetalleConsumibleADetalleDTO(d));
+                detalles.add(convertirDetalle(d));
             }
         }
-        return convertirAEntregaResponseDTO(entrega, detallesDTO);
+        return toResponseDTO(entrega, detalles);
     }
 
-    private EntregaEppResponseDTO convertirAEntregaResponseDTO(EntregaEpp entrega,
-                                                                List<DetalleEntregaDTO> detallesDTO) {
+    private EntregaEppResponseDTO toResponseDTO(EntregaEpp entrega, List<DetalleEntregaDTO> detalles) {
         return EntregaEppResponseDTO.builder()
                 .entregaId(entrega.getEntregaId())
-                .fechaEntrega(entrega.getFechaEntrega())
-                .jefeAreaId(entrega.getJefeArea() != null
-                        && entrega.getJefeArea().getTrabajador() != null
-                        ? entrega.getJefeArea().getTrabajador().getTrabajadorId() : null)
-                .jefeAreaNombre(resolverNombreJefe(entrega.getJefeArea()))
                 .trabajadorId(entrega.getTrabajador().getTrabajadorId())
+                .trabajadorNombre(entrega.getTrabajador().getNombres() + " " + entrega.getTrabajador().getApellidos())
                 .trabajadorDni(entrega.getTrabajador().getDni())
-                .trabajadorNombre(entrega.getTrabajador().getNombres() + " "
-                        + entrega.getTrabajador().getApellidos())
+                .supervisorId(entrega.getSupervisorUsuario() != null ? entrega.getSupervisorUsuario().getUsuarioId() : null)
+                .supervisorNombre(resolverNombreSupervisor(entrega.getSupervisorUsuario()))
+                .fechaEntrega(entrega.getFechaEntrega())
                 .tipoEntrega(entrega.getTipoEntrega())
                 .status(entrega.getStatus())
                 .observaciones(entrega.getObservaciones())
-                .detalles(detallesDTO)
+                .detalles(detalles)
                 .build();
     }
 
-    private DetalleEntregaDTO convertirDetalleConsumibleADetalleDTO(DetalleEntregaEpp detalle) {
+    private DetalleEntregaDTO convertirDetalle(DetalleEntregaEpp d) {
         return DetalleEntregaDTO.builder()
-                .detalleId(detalle.getDetalleId())
-                .eppId(detalle.getEpp().getEppId())
-                .eppNombre(detalle.getEpp().getNombreEpp())
-                .tipoUso(detalle.getEpp().getTipoUso())
-                .cantidad(detalle.getCantidad())
-                .motivo(detalle.getMotivo())
-                .eppMarca(detalle.getEpp().getFabricante())
+                .detalleId(d.getDetalleId())
+                .eppId(d.getEpp().getEppId())
+                .eppNombre(d.getEpp().getNombreEpp())
+                .tipoUso(d.getEpp().getTipoUso())
+                .cantidad(d.getCantidad())
+                .motivo(d.getMotivo())
+                .eppMarca(d.getEpp().getFabricante())
                 .eppUnidadMedida(null)
                 .build();
     }
 
-    private DetalleEntregaDTO convertirInstanciaADetalleDTO(InstanciaEpp instancia) {
-        DetalleEntregaEpp detalle = instancia.getDetalleEntrega();
+    private DetalleEntregaDTO convertirInstancia(InstanciaEpp inst) {
+        DetalleEntregaEpp d = inst.getDetalleEntrega();
         return DetalleEntregaDTO.builder()
-                .detalleId(detalle != null ? detalle.getDetalleId() : null)
-                .eppId(instancia.getEpp().getEppId())
-                .eppNombre(instancia.getEpp().getNombreEpp())
-                .tipoUso(instancia.getEpp().getTipoUso())
+                .detalleId(d != null ? d.getDetalleId() : null)
+                .eppId(inst.getEpp().getEppId())
+                .eppNombre(inst.getEpp().getNombreEpp())
+                .tipoUso(inst.getEpp().getTipoUso())
                 .cantidad(1)
-                .instanciaEppId(instancia.getInstanciaEppId())
-                .eppCodigoSerie(instancia.getCodigoSerie())
-                .motivo(detalle != null ? detalle.getMotivo() : null)
-                .eppMarca(instancia.getEpp().getFabricante())
+                .instanciaEppId(inst.getInstanciaEppId())
+                .eppCodigoSerie(inst.getCodigoSerie())
+                .motivo(d != null ? d.getMotivo() : null)
+                .eppMarca(inst.getEpp().getFabricante())
                 .eppUnidadMedida(null)
                 .build();
     }
 
-    private String resolverNombreJefe(Usuario jefeArea) {
-        if (jefeArea == null) return null;
-        if (jefeArea.getTrabajador() != null) {
-            return jefeArea.getTrabajador().getNombres() + " " + jefeArea.getTrabajador().getApellidos();
-        }
-        return jefeArea.getNombreUsuario();
+    private String resolverNombreSupervisor(Usuario supervisor) {
+        if (supervisor == null) return null;
+        if (supervisor.getNombreCompleto() != null && !supervisor.getNombreCompleto().isBlank())
+            return supervisor.getNombreCompleto();
+        return supervisor.getNombreUsuario();
     }
 }

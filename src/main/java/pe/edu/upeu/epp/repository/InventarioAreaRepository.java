@@ -62,13 +62,11 @@ public interface InventarioAreaRepository extends JpaRepository<InventarioArea, 
     // ── Stock bajo ───────────────────────────────────────────────────────
 
     @Query("SELECT ia FROM InventarioArea ia " +
-           "WHERE ia.area = :area AND ia.cantidadActual <= ia.cantidadMinima " +
-           "ORDER BY ia.epp.nombreEpp")
+            "WHERE ia.area = :area AND ia.cantidadActual <= ia.epp.cantidadMinima")
     List<InventarioArea> findStockBajoByArea(@Param("area") Area area);
 
     @Query("SELECT ia FROM InventarioArea ia " +
-           "WHERE ia.cantidadActual <= ia.cantidadMinima " +
-           "ORDER BY ia.area.nombreArea, ia.epp.nombreEpp")
+            "WHERE ia.cantidadActual <= ia.epp.cantidadMinima")
     List<InventarioArea> findStockBajo();
 
     List<InventarioArea> findByEstado(EstadoEpp estado);
