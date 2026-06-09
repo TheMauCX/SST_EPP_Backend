@@ -10,97 +10,136 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import pe.edu.upeu.epp.dto.response.DashboardGastosResponseDTO;
-import pe.edu.upeu.epp.dto.response.FichaTrabajadorResponseDTO;
-import pe.edu.upeu.epp.dto.response.RotacionConsumoResponseDTO;
+import pe.edu.upeu.epp.dto.response.*;
 import pe.edu.upeu.epp.service.ReporteService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/reportes")
 @RequiredArgsConstructor
-@Tag(name = "Reportes y Dashboard", description = "Indicadores financieros y análisis de consumo de EPPs")
+@Tag(name = "Reportes y Dashboard",
+     description = "Indicadores financieros, estadísticas de consumo y análisis de inventario EPP")
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'COORDINADOR_SST', 'ADMINISTRADOR_SISTEMA')")
+@PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
 public class ReporteController {
 
     private final ReporteService reporteService;
 
     // ── HU-14: Dashboard de gastos ───────────────────────────────────────
 
-    /**
-     * Retorna el gasto mensual en EPPs calculado como:
-     * SUM(cantidad_entregada × costo_unitario) agrupado por mes.
-     *
-     * @param areaId  Filtro opcional por área. Omitir para ver todas las áreas.
-     * @param meses   Cantidad de meses hacia atrás a incluir (default: 12).
-     */
     @GetMapping("/gastos")
     @Operation(
-            summary = "Dashboard de gastos por mes",
-            description = "Retorna el array de gasto mensual para alimentar el gráfico de barras. " +
-                    "Fórmula: cantidad_entregada × precio_unitario de la última compra del EPP.")
+            summary = "Gastos mensuales",
+            description = "Gasto mensual en EPPs = SUM(cantidad_entregada × precio_unitario) por mes.")
     public ResponseEntity<DashboardGastosResponseDTO> dashboardGastos(
-            @Parameter(description = "Filtrar por ID de área (opcional)")
             @RequestParam(required = false) Integer areaId,
-            @Parameter(description = "Meses hacia atrás (default 12)")
             @RequestParam(defaultValue = "12") int meses) {
         return ResponseEntity.ok(reporteService.calcularGastosMensuales(areaId, meses));
     }
 
-    // ── HU-15: Rotación y consumo ─────────────────────────────────────────
+    // ── HU-15: Rotación ──────────────────────────────────────────────────
 
-    /**
-     * Retorna dos listas:
-     *   - mayorRotacion: top EPPs más entregados en el período
-     *   - inmovilizados: EPPs con cero salidas en el período
-     *
-     * @param meses Período de análisis en meses hacia atrás (default: 3).
-     */
     @GetMapping("/rotacion")
     @Operation(
-            summary = "Análisis de rotación y consumo",
-            description = "Devuelve los EPPs con mayor rotación y los inmovilizados " +
-                    "para optimizar futuras compras.")
+            summary = "Rotación y EPPs inmovilizados",
+            description = "Top EPPs más entregados y EPPs sin salidas en el período.")
     public ResponseEntity<RotacionConsumoResponseDTO> analisisRotacion(
-            @Parameter(description = "Período en meses hacia atrás (default 3)")
             @RequestParam(defaultValue = "3") int meses) {
         return ResponseEntity.ok(reporteService.calcularRotacion(meses));
     }
 
-    // ── HU-6: Ficha de trabajador ─────────────────────────────────────────
+    // ── HU-6: Ficha de trabajador ────────────────────────────────────────
 
-    /**
-     * Retorna el historial completo de EPPs entregados a un trabajador.
-     * Incluye: EPP, talla, cantidad, motivo, fecha, quién entregó.
-     */
     @GetMapping("/trabajadores/{trabajadorId}/ficha")
-    @Operation(
-            summary = "Ficha de EPPs de un trabajador",
-            description = "Lista completa del historial de entregas de EPP a un trabajador. " +
-                    "Accesible también desde TrabajadorController como alias.")
+    @Operation(summary = "Ficha de EPPs de un trabajador (JSON)")
     public ResponseEntity<FichaTrabajadorResponseDTO> fichaTrabajador(
-            @Parameter(description = "ID del trabajador") @PathVariable Integer trabajadorId) {
+            @PathVariable Integer trabajadorId) {
         return ResponseEntity.ok(reporteService.generarFichaTrabajador(trabajadorId));
     }
 
-    /**
-     * HU-6: Descarga la ficha del trabajador en formato PDF.
-     * El PDF se genera en tiempo de ejecución con Apache PDFBox.
-     */
     @GetMapping(value = "/trabajadores/{trabajadorId}/ficha/pdf",
                 produces = MediaType.APPLICATION_PDF_VALUE)
-    @Operation(
-            summary = "Descargar ficha como PDF",
-            description = "Genera y descarga el PDF de la ficha de EPPs de un trabajador.")
-    public ResponseEntity<byte[]> fichaTrabajadorPdf(
-            @Parameter(description = "ID del trabajador") @PathVariable Integer trabajadorId) {
-
+    @Operation(summary = "Ficha de EPPs de un trabajador (PDF descargable)")
+    public ResponseEntity<byte[]> fichaTrabajadorPdf(@PathVariable Integer trabajadorId) {
         byte[] pdf = reporteService.generarFichaTrabajadorPdf(trabajadorId);
-        String filename = "ficha-trabajador-" + trabajadorId + ".pdf";
-
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"ficha-trabajador-" + trabajadorId + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ESTADÍSTICAS NUEVAS
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * A — Precio unitario actual de todos los EPPs.
+     * Ideal para alimentar un gráfico de barras comparativo.
+     * Retorna lista ordenada de mayor a menor precio.
+     */
+    @GetMapping("/estadisticas/precios-epp")
+    @Operation(
+            summary = "Precios actuales de todos los EPPs",
+            description = "Devuelve el precio unitario del lote más reciente de cada EPP. " +
+                    "Ordenado de mayor a menor. Usar para gráfico de barras comparativo.")
+    public ResponseEntity<List<PrecioEppDTO>> preciosActuales() {
+        return ResponseEntity.ok(reporteService.obtenerPreciosActuales());
+    }
+
+    /**
+     * B — Historial de precios de un EPP específico.
+     * Cada punto representa una compra distinta (lote diferente).
+     */
+    @GetMapping("/estadisticas/historial-precios/{eppId}")
+    @Operation(
+            summary = "Historial de precios de un EPP",
+            description = "Muestra cómo ha evolucionado el precio unitario de un EPP " +
+                    "en cada compra registrada. Incluye mín, máx, promedio y precio actual.")
+    public ResponseEntity<HistorialPreciosEppDTO> historialPrecios(
+            @Parameter(description = "ID del EPP") @PathVariable Integer eppId) {
+        return ResponseEntity.ok(reporteService.obtenerHistorialPrecios(eppId));
+    }
+
+    /**
+     * C — Valor monetario del inventario central.
+     * Cuánto dinero está inmovilizado en stock (cantidad × costo unitario).
+     */
+    @GetMapping("/estadisticas/valor-inventario")
+    @Operation(
+            summary = "Valorización del inventario central",
+            description = "Calcula el valor total del stock actual: SUM(cantidad × costo_unitario) " +
+                    "por cada EPP. Incluye porcentaje de cada EPP sobre el total.")
+    public ResponseEntity<ValorInventarioDTO> valorInventario() {
+        return ResponseEntity.ok(reporteService.calcularValorInventario());
+    }
+
+    /**
+     * D — Trabajadores con mayor valor acumulado de EPPs recibidos.
+     * Permite identificar quién consume más presupuesto.
+     */
+    @GetMapping("/estadisticas/trabajadores-mayor-gasto")
+    @Operation(
+            summary = "Trabajadores que más gastan en EPPs",
+            description = "Ranking de trabajadores por el valor total de EPPs recibidos " +
+                    "(cantidad × precio unitario). Parámetro 'top' limita el número de resultados.")
+    public ResponseEntity<TrabajadorMayorGastoDTO> trabajadoresMayorGasto(
+            @Parameter(description = "Número de trabajadores a retornar (default: 10)")
+            @RequestParam(defaultValue = "10") int top) {
+        return ResponseEntity.ok(reporteService.calcularTrabajadoresMayorGasto(top));
+    }
+
+    /**
+     * E — EPPs más comprados: frecuencia en facturas.
+     * Diferente a rotación — mide compras, no entregas.
+     */
+    @GetMapping("/estadisticas/frecuencia-compras")
+    @Operation(
+            summary = "EPPs más comprados (frecuencia en facturas)",
+            description = "Muestra cuántas veces aparece cada EPP en facturas de compra, " +
+                    "cuántas unidades se compraron en total y el gasto histórico acumulado.")
+    public ResponseEntity<FrecuenciaComprasDTO> frecuenciaCompras() {
+        return ResponseEntity.ok(reporteService.calcularFrecuenciaCompras());
     }
 }
