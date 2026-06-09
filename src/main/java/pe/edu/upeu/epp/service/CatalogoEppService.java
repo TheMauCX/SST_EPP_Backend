@@ -12,13 +12,15 @@ import pe.edu.upeu.epp.dto.request.CatalogoEppRequestDTO;
 import pe.edu.upeu.epp.dto.request.CatalogoEppUpdateDTO;
 import pe.edu.upeu.epp.dto.response.CatalogoEppResponseDTO;
 import pe.edu.upeu.epp.dto.response.CatalogoTallaResponseDTO;
+import pe.edu.upeu.epp.dto.response.NormaEppResponseDTO;
 import pe.edu.upeu.epp.entity.CatalogoEpp;
 import pe.edu.upeu.epp.entity.CatalogoTalla;
+import pe.edu.upeu.epp.entity.NormaEpp;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.CatalogoEppRepository;
 import pe.edu.upeu.epp.repository.CatalogoTallaRepository;
+import pe.edu.upeu.epp.repository.NormaEppRepository;
 
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,16 +33,19 @@ public class CatalogoEppService {
 
     private final CatalogoEppRepository catalogoEppRepository;
     private final CatalogoTallaRepository tallaRepository;
+    private final NormaEppRepository normaEppRepository;
     private final AzureStorageService azureStorageService;
-
-    // ── Crear ────────────────────────────────────────────────────────────
+    private final NormaEppService normaEppService;
 
     @Transactional
     public CatalogoEppResponseDTO crear(CatalogoEppRequestDTO request, MultipartFile fotoArchivo) {
-        log.info("Creando nuevo EPP: {}", request.getNombreEpp());
+        String urlFoto = null;
+        if (fotoArchivo != null && !fotoArchivo.isEmpty()) {
+            urlFoto = azureStorageService.subirFotoEpp(fotoArchivo, 0);
+        }
 
-        String urlFoto = resolverFoto(fotoArchivo, request.getFotoReferencia(), null);
         Set<CatalogoTalla> tallas = resolverTallas(request.getTallaIds());
+        Set<NormaEpp> normas = resolverNormas(request.getNormaIds());
 
         CatalogoEpp epp = CatalogoEpp.builder()
                 .nombreEpp(request.getNombreEpp())
@@ -53,183 +58,159 @@ public class CatalogoEppService {
                 .condicionesMantenimiento(request.getCondicionesMantenimiento())
                 .condicionesAlmacenamiento(request.getCondicionesAlmacenamiento())
                 .condicionesCambioPrematuro(request.getCondicionesCambioPrematuro())
-                .fotoReferencia(urlFoto)
+                .fotoReferencia(urlFoto != null ? urlFoto : request.getFotoReferencia())
                 .color(request.getColor())
+                .cantidadMinima(request.getCantidadMinima() != null ? request.getCantidadMinima() : 0)
+                .cantidadMaxima(request.getCantidadMaxima())
                 .tallasDisponibles(tallas)
+                .normасAplicables(normas)
                 .activo(true)
                 .build();
 
-        return mapToResponseDTO(catalogoEppRepository.save(epp));
-    }
+        CatalogoEpp saved = catalogoEppRepository.save(epp);
 
-    // ── Actualizar ───────────────────────────────────────────────────────
+        // Si se subió la foto con ID temporal 0, actualizar con el ID real
+        if (fotoArchivo != null && !fotoArchivo.isEmpty()) {
+            String urlFotoReal = azureStorageService.subirFotoEpp(fotoArchivo, saved.getEppId());
+            saved.setFotoReferencia(urlFotoReal);
+            saved = catalogoEppRepository.save(saved);
+        }
+
+        return toResponseDTO(saved);
+    }
 
     @Transactional
     public CatalogoEppResponseDTO actualizar(Integer id, CatalogoEppUpdateDTO request, MultipartFile fotoArchivo) {
-        log.info("Actualizando EPP con ID: {}", id);
-
         CatalogoEpp epp = catalogoEppRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + id));
 
-        // Foto: si viene archivo nuevo, subir; si viene URL, usar; si no viene nada, mantener la actual
-        String urlFoto = resolverFoto(fotoArchivo, request.getFotoReferencia(), epp.getFotoReferencia());
-        epp.setFotoReferencia(urlFoto);
+        if (request.getNombreEpp()             != null) epp.setNombreEpp(request.getNombreEpp());
+        if (request.getTipoUso()               != null) epp.setTipoUso(request.getTipoUso());
+        if (request.getAprobacionesNormas()    != null) epp.setAprobacionesNormas(request.getAprobacionesNormas());
+        if (request.getCaracteristicas()       != null) epp.setCaracteristicas(request.getCaracteristicas());
+        if (request.getFabricante()            != null) epp.setFabricante(request.getFabricante());
+        if (request.getTiempoUsoFabricante()   != null) epp.setTiempoUsoFabricante(request.getTiempoUsoFabricante());
+        if (request.getTiempoUsoOperacion()    != null) epp.setTiempoUsoOperacion(request.getTiempoUsoOperacion());
+        if (request.getCondicionesMantenimiento()   != null) epp.setCondicionesMantenimiento(request.getCondicionesMantenimiento());
+        if (request.getCondicionesAlmacenamiento()  != null) epp.setCondicionesAlmacenamiento(request.getCondicionesAlmacenamiento());
+        if (request.getCondicionesCambioPrematuro()  != null) epp.setCondicionesCambioPrematuro(request.getCondicionesCambioPrematuro());
+        if (request.getFotoReferencia()        != null) epp.setFotoReferencia(request.getFotoReferencia());
+        if (request.getColor()                 != null) epp.setColor(request.getColor());
+        if (request.getActivo()                != null) epp.setActivo(request.getActivo());
+        if (request.getCantidadMinima()        != null) epp.setCantidadMinima(request.getCantidadMinima());
+        if (request.getCantidadMaxima()        != null) epp.setCantidadMaxima(request.getCantidadMaxima());
 
-        if (request.getNombreEpp() != null)                 epp.setNombreEpp(request.getNombreEpp());
-        if (request.getTipoUso() != null)                   epp.setTipoUso(request.getTipoUso());
-        if (request.getAprobacionesNormas() != null)        epp.setAprobacionesNormas(request.getAprobacionesNormas());
-        if (request.getCaracteristicas() != null)           epp.setCaracteristicas(request.getCaracteristicas());
-        if (request.getFabricante() != null)                epp.setFabricante(request.getFabricante());
-        if (request.getTiempoUsoFabricante() != null)       epp.setTiempoUsoFabricante(request.getTiempoUsoFabricante());
-        if (request.getTiempoUsoOperacion() != null)        epp.setTiempoUsoOperacion(request.getTiempoUsoOperacion());
-        if (request.getCondicionesMantenimiento() != null)  epp.setCondicionesMantenimiento(request.getCondicionesMantenimiento());
-        if (request.getCondicionesAlmacenamiento() != null) epp.setCondicionesAlmacenamiento(request.getCondicionesAlmacenamiento());
-        if (request.getCondicionesCambioPrematuro() != null)epp.setCondicionesCambioPrematuro(request.getCondicionesCambioPrematuro());
-        if (request.getActivo() != null)                    epp.setActivo(request.getActivo());
-        if (request.getColor() != null)                     epp.setColor(request.getColor());
-
-        // Tallas: si vienen en el request, reemplazar el set completo
-        if (request.getTallaIds() != null) {
+        if (request.getTallaIds() != null)
             epp.setTallasDisponibles(resolverTallas(request.getTallaIds()));
-        }
 
-        return mapToResponseDTO(catalogoEppRepository.save(epp));
+        // Normas: null = no modificar, Set vacío = eliminar todas
+        if (request.getNormaIds() != null)
+            epp.setNormасAplicables(resolverNormas(request.getNormaIds()));
+
+        if (fotoArchivo != null && !fotoArchivo.isEmpty())
+            epp.setFotoReferencia(azureStorageService.subirFotoEpp(fotoArchivo, id));
+
+        return toResponseDTO(catalogoEppRepository.save(epp));
     }
 
-    // ── HU-19: Subir ficha técnica PDF ───────────────────────────────────
-
-    /**
-     * Recibe un PDF y lo sube a Azure en la carpeta epps/fichas/.
-     * Actualiza el campo fichaTecnicaPath en la entidad.
-     */
     @Transactional
-    public CatalogoEppResponseDTO subirFichaTecnica(Integer eppId, MultipartFile pdfFile) {
-        log.info("Subiendo ficha técnica para EPP ID: {}", eppId);
-
-        CatalogoEpp epp = catalogoEppRepository.findById(eppId)
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + eppId));
-
-        String urlPdf = azureStorageService.subirFichaTecnica(pdfFile, eppId);
-        epp.setFichaTecnicaPath(urlPdf);
-
-        log.info("Ficha técnica subida: {}", urlPdf);
-        return mapToResponseDTO(catalogoEppRepository.save(epp));
+    public CatalogoEppResponseDTO subirFichaTecnica(Integer id, MultipartFile file) {
+        CatalogoEpp epp = catalogoEppRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + id));
+        epp.setFichaTecnicaPath(azureStorageService.subirFichaTecnica(file, id));
+        return toResponseDTO(catalogoEppRepository.save(epp));
     }
 
-    // ── HU-23: Filtros en catálogo ───────────────────────────────────────
-
-    /**
-     * Lista EPPs con filtro por rotación.
-     * rotacion = "alta"  → EPPs con más de 0 entregas en los últimos 90 días
-     * rotacion = "nula"  → EPPs sin ninguna entrega en los últimos 90 días
-     * rotacion = null    → todos (comportamiento anterior)
-     */
     @Transactional(readOnly = true)
-    public Page<CatalogoEppResponseDTO> listarTodos(Pageable pageable, String rotacion) {
-        if (rotacion == null || rotacion.isBlank()) {
-            return catalogoEppRepository.findAll(pageable).map(this::mapToResponseDTO);
-        }
-        LocalDateTime desde = LocalDateTime.now().minusDays(90);
-        return switch (rotacion.toLowerCase()) {
-            case "alta" -> catalogoEppRepository.findConRotacionAlta(desde, pageable).map(this::mapToResponseDTO);
-            case "nula" -> catalogoEppRepository.findSinRotacion(desde, pageable).map(this::mapToResponseDTO);
-            default     -> catalogoEppRepository.findAll(pageable).map(this::mapToResponseDTO);
-        };
+    public Page<CatalogoEppResponseDTO> listar(Pageable pageable, String rotacion) {
+        java.time.LocalDateTime desde = java.time.LocalDateTime.now().minusDays(90);
+        if ("alta".equalsIgnoreCase(rotacion))
+            return catalogoEppRepository.findConRotacionAlta(desde, pageable).map(this::toResponseDTO);
+        if ("nula".equalsIgnoreCase(rotacion))
+            return catalogoEppRepository.findSinRotacion(desde, pageable).map(this::toResponseDTO);
+        return catalogoEppRepository.findAll(pageable).map(this::toResponseDTO);
     }
-
-    // ── Consultas básicas (sin cambios) ──────────────────────────────────
 
     @Transactional(readOnly = true)
     public CatalogoEppResponseDTO obtenerPorId(Integer id) {
-        return mapToResponseDTO(catalogoEppRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + id)));
-    }
-
-    @Transactional(readOnly = true)
-    public Page<CatalogoEppResponseDTO> listarTodos(Pageable pageable) {
-        return listarTodos(pageable, null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<CatalogoEppResponseDTO> listarActivos() {
-        return catalogoEppRepository.findByActivoTrue().stream()
-                .map(this::mapToResponseDTO).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<CatalogoEppResponseDTO> buscarPorNombre(String nombre) {
-        return catalogoEppRepository.buscarPorNombreActivo(nombre).stream()
-                .map(this::mapToResponseDTO).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<CatalogoEppResponseDTO> buscarPorFabricante(String fabricante) {
-        return catalogoEppRepository.findByFabricante(fabricante).stream()
-                .map(this::mapToResponseDTO).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<CatalogoEppResponseDTO> buscarPorNorma(String norma) {
-        return catalogoEppRepository.buscarPorNorma(norma).stream()
-                .map(this::mapToResponseDTO).collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<CatalogoEppResponseDTO> listarPorTipo(CatalogoEpp.TipoUso tipoUso) {
-        return catalogoEppRepository.findByTipoUso(tipoUso).stream()
-                .map(this::mapToResponseDTO).collect(Collectors.toList());
+        return toResponseDTO(catalogoEppRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + id)));
     }
 
     @Transactional
     public void eliminar(Integer id) {
         CatalogoEpp epp = catalogoEppRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado con ID: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("EPP no encontrado: " + id));
         epp.setActivo(false);
         catalogoEppRepository.save(epp);
     }
-
-    // ── Helpers privados ─────────────────────────────────────────────────
-
-    /**
-     * Resuelve la URL de la foto con prioridad:
-     * 1. Archivo multipart nuevo → subir a Azure
-     * 2. URL texto en request → usar directamente
-     * 3. URL anterior → mantener
-     */
-    private String resolverFoto(MultipartFile archivo, String urlRequest, String urlActual) {
-        if (archivo != null && !archivo.isEmpty()) {
-            return azureStorageService.subirArchivo(archivo); // método genérico legacy
-        }
-        if (urlRequest != null && !urlRequest.isBlank()) {
-            return urlRequest;
-        }
-        return urlActual;
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> listarActivos() {
+        return catalogoEppRepository.findByActivoTrue().stream()
+                .map(this::toResponseDTO).collect(Collectors.toList());
     }
 
-    private Set<CatalogoTalla> resolverTallas(Set<Integer> tallaIds) {
-        if (tallaIds == null || tallaIds.isEmpty()) return new HashSet<>();
-        Set<CatalogoTalla> tallas = new HashSet<>();
-        for (Integer tallaId : tallaIds) {
-            CatalogoTalla talla = tallaRepository.findById(tallaId)
-                    .orElseThrow(() -> new BusinessException("Talla no encontrada con ID: " + tallaId));
-            tallas.add(talla);
-        }
-        return tallas;
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> buscarPorNombre(String nombre) {
+        return catalogoEppRepository.buscarPorNombreActivo(nombre).stream()
+                .map(this::toResponseDTO).collect(Collectors.toList());
     }
 
-    // ── Mapeo ────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> buscarPorFabricante(String fabricante) {
+        return catalogoEppRepository.findByFabricante(fabricante).stream()
+                .map(this::toResponseDTO).collect(Collectors.toList());
+    }
 
-    private CatalogoEppResponseDTO mapToResponseDTO(CatalogoEpp epp) {
-        Set<CatalogoTallaResponseDTO> tallasDTO = epp.getTallasDisponibles() == null
-                ? new HashSet<>()
-                : epp.getTallasDisponibles().stream()
-                    .map(t -> CatalogoTallaResponseDTO.builder()
-                            .tallaId(t.getTallaId())
-                            .nombre(t.getNombre())
-                            .descripcion(t.getDescripcion())
-                            .ordenVisualizacion(t.getOrdenVisualizacion())
-                            .build())
-                    .collect(Collectors.toSet());
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> listarPorTipo(CatalogoEpp.TipoUso tipoUso) {
+        return catalogoEppRepository.findByTipoUso(tipoUso).stream()
+                .map(this::toResponseDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogoEppResponseDTO> buscarPorNorma(String texto) {
+        return catalogoEppRepository.findAll().stream()
+                .filter(epp -> epp.getNormасAplicables().stream()
+                        .anyMatch(n -> n.getCodigo().toLowerCase().contains(texto.toLowerCase())
+                                || n.getNombreCorto().toLowerCase().contains(texto.toLowerCase())))
+                .map(this::toResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private Set<CatalogoTalla> resolverTallas(Set<Integer> ids) {
+        if (ids == null || ids.isEmpty()) return new HashSet<>();
+        return new HashSet<>(tallaRepository.findAllById(ids));
+    }
+
+    private Set<NormaEpp> resolverNormas(Set<Integer> ids) {
+        if (ids == null || ids.isEmpty()) return new HashSet<>();
+        List<NormaEpp> encontradas = normaEppRepository.findAllById(ids);
+        if (encontradas.size() != ids.size()) {
+            Set<Integer> encontradosIds = encontradas.stream()
+                    .map(NormaEpp::getNormaId).collect(Collectors.toSet());
+            Set<Integer> faltantes = new HashSet<>(ids);
+            faltantes.removeAll(encontradosIds);
+            throw new BusinessException("Normas no encontradas con IDs: " + faltantes);
+        }
+        return new HashSet<>(encontradas);
+    }
+
+    // ── Mapeo ─────────────────────────────────────────────────────────────────
+
+    public CatalogoEppResponseDTO toResponseDTO(CatalogoEpp epp) {
+        Set<CatalogoTallaResponseDTO> tallasDTO = epp.getTallasDisponibles().stream()
+                .map(t -> CatalogoTallaResponseDTO.builder()
+                        .tallaId(t.getTallaId()).nombre(t.getNombre())
+                        .descripcion(t.getDescripcion())
+                        .ordenVisualizacion(t.getOrdenVisualizacion()).build())
+                .collect(Collectors.toSet());
+
+        Set<NormaEppResponseDTO> normasDTO = epp.getNormасAplicables().stream()
+                .map(normaEppService::toDTO)
+                .collect(Collectors.toSet());
 
         return CatalogoEppResponseDTO.builder()
                 .eppId(epp.getEppId())
@@ -244,9 +225,12 @@ public class CatalogoEppService {
                 .condicionesAlmacenamiento(epp.getCondicionesAlmacenamiento())
                 .condicionesCambioPrematuro(epp.getCondicionesCambioPrematuro())
                 .fotoReferencia(epp.getFotoReferencia())
+                .fichaTecnicaPath(epp.getFichaTecnicaPath())
                 .color(epp.getColor())
                 .tallasDisponibles(tallasDTO)
-                .fichaTecnicaPath(epp.getFichaTecnicaPath())
+                .normasAplicables(normasDTO)
+                .cantidadMinima(epp.getCantidadMinima())
+                .cantidadMaxima(epp.getCantidadMaxima())
                 .activo(epp.getActivo())
                 .fechaCreacion(epp.getFechaCreacion())
                 .fechaActualizacion(epp.getFechaActualizacion())

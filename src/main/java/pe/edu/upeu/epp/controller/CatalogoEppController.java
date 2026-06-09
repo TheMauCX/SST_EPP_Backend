@@ -108,7 +108,7 @@ public class CatalogoEppController {
             @PageableDefault(size = 20, sort = "nombreEpp", direction = Sort.Direction.ASC) Pageable pageable,
             @Parameter(description = "Filtro por rotación: alta | nula")
             @RequestParam(required = false) String rotacion) {
-        return ResponseEntity.ok(catalogoEppService.listarTodos(pageable, rotacion));
+        return ResponseEntity.ok(catalogoEppService.listar(pageable, rotacion));
     }
 
     @GetMapping("/activos")

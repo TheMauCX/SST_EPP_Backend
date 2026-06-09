@@ -3,10 +3,7 @@ package pe.edu.upeu.epp.service;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.upeu.epp.dto.request.AjusteInventarioDTO;
@@ -20,6 +17,7 @@ import pe.edu.upeu.epp.repository.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -69,7 +67,7 @@ public class InventarioCentralService {
         return mapToResponseDTO(inventarioCentralRepository.save(inv));
     }
 
-    // ── Listar con filtros ────────────────────────────────────────────────────
+    // ── Listar estándar ───────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable, String sort, String filter) {
@@ -86,38 +84,29 @@ public class InventarioCentralService {
         return inventarioCentralRepository.findAll(pageable).map(this::mapToResponseDTO);
     }
 
-    @Transactional(readOnly = true)
-    public Page<InventarioCentralResponseDTO> listarTodos(Pageable pageable) {
-        return listarTodos(pageable, null, null);
-    }
-
-    // ── Vista agrupada (EPP + proveedor + lote) ───────────────────────────────
+    // ── Vista agrupada paginada ───────────────────────────────────────────────
 
     /**
-     * Devuelve una lista donde cada elemento agrupa todos los registros del
-     * inventario central que comparten (epp_id, proveedor, lote).
-     * Dentro de cada grupo, se listan las tallas con sus cantidades y precios.
+     * Agrupa registros por (epp_id, proveedor, lote) y pagina el resultado.
+     * Cada grupo expone todas las tallas con sus cantidades y costos.
      */
     @Transactional(readOnly = true)
-    public List<InventarioAgrupadoResponseDTO> listarAgrupado() {
+    public Page<InventarioAgrupadoResponseDTO> listarAgrupadoPaginado(Pageable pageable) {
         List<InventarioCentral> todos = inventarioCentralRepository.findAll();
 
-        // Agrupar por (eppId, proveedor, lote)
         Map<String, List<InventarioCentral>> grupos = todos.stream()
                 .collect(Collectors.groupingBy(inv ->
                         inv.getEpp().getEppId()
                         + "||" + Objects.toString(inv.getProveedor(), "")
-                        + "||" + Objects.toString(inv.getLote(), "")
-                ));
+                        + "||" + Objects.toString(inv.getLote(), "")));
 
-        return grupos.values().stream()
+        List<InventarioAgrupadoResponseDTO> agrupados = grupos.values().stream()
                 .map(registros -> {
                     InventarioCentral primero = registros.get(0);
                     CatalogoEpp epp = primero.getEpp();
 
                     int totalCantidad = registros.stream()
-                            .mapToInt(r -> r.getCantidadActual() != null ? r.getCantidadActual() : 0)
-                            .sum();
+                            .mapToInt(r -> r.getCantidadActual() != null ? r.getCantidadActual() : 0).sum();
 
                     List<InventarioAgrupadoResponseDTO.DetalleTallaDTO> detalles = registros.stream()
                             .map(r -> InventarioAgrupadoResponseDTO.DetalleTallaDTO.builder()
@@ -128,20 +117,15 @@ public class InventarioCentralService {
                                     .costoUnitario(r.getCostoUnitario())
                                     .estadoNombre(r.getEstado() != null ? r.getEstado().getNombre() : null)
                                     .build())
-                            .sorted(Comparator.comparing(
-                                    d -> d.getTallaNombre() != null ? d.getTallaNombre() : ""))
+                            .sorted(Comparator.comparing(d -> d.getTallaNombre() != null ? d.getTallaNombre() : ""))
                             .collect(Collectors.toList());
 
-                    boolean necesita = epp.getCantidadMinima() != null
-                            && totalCantidad <= epp.getCantidadMinima();
+                    boolean necesita = epp.getCantidadMinima() != null && totalCantidad <= epp.getCantidadMinima();
 
                     return InventarioAgrupadoResponseDTO.builder()
-                            .eppId(epp.getEppId())
-                            .eppNombre(epp.getNombreEpp())
-                            .tipoUso(epp.getTipoUso())
-                            .color(epp.getColor())
-                            .lote(primero.getLote())
-                            .proveedor(primero.getProveedor())
+                            .eppId(epp.getEppId()).eppNombre(epp.getNombreEpp())
+                            .tipoUso(epp.getTipoUso()).color(epp.getColor())
+                            .lote(primero.getLote()).proveedor(primero.getProveedor())
                             .fechaAdquisicion(primero.getFechaAdquisicion())
                             .fechaVencimiento(primero.getFechaVencimiento())
                             .totalCantidad(totalCantidad)
@@ -153,6 +137,15 @@ public class InventarioCentralService {
                 })
                 .sorted(Comparator.comparing(InventarioAgrupadoResponseDTO::getEppNombre))
                 .collect(Collectors.toList());
+
+        // Paginación manual
+        int total = agrupados.size();
+        int start = (int) pageable.getOffset();
+        int end   = Math.min(start + pageable.getPageSize(), total);
+        List<InventarioAgrupadoResponseDTO> pageContent =
+                start > total ? Collections.emptyList() : agrupados.subList(start, end);
+
+        return new PageImpl<>(pageContent, pageable, total);
     }
 
     // ── Consultas estándar ────────────────────────────────────────────────────
@@ -187,15 +180,12 @@ public class InventarioCentralService {
     public InventarioCentralResponseDTO actualizar(Integer id, InventarioCentralUpdateDTO request) {
         InventarioCentral inv = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id));
-
-        if (request.getEstadoId() != null) {
+        if (request.getEstadoId() != null)
             inv.setEstado(estadoEppRepository.findById(request.getEstadoId())
                     .orElseThrow(() -> new EntityNotFoundException("Estado no encontrado")));
-        }
-        if (request.getLote() != null)          inv.setLote(request.getLote());
+        if (request.getLote()            != null) inv.setLote(request.getLote());
         if (request.getUbicacionBodega() != null) inv.setUbicacionBodega(request.getUbicacionBodega());
-        if (request.getObservaciones() != null)  inv.setObservaciones(request.getObservaciones());
-
+        if (request.getObservaciones()   != null) inv.setObservaciones(request.getObservaciones());
         return mapToResponseDTO(inventarioCentralRepository.save(inv));
     }
 
@@ -203,14 +193,10 @@ public class InventarioCentralService {
     public InventarioCentralResponseDTO ajustarStock(Integer id, AjusteInventarioDTO request) {
         InventarioCentral inv = inventarioCentralRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado: " + id));
-
         int ajuste = "SALIDA".equals(request.getTipoAjuste())
-                ? -request.getCantidadAjuste()
-                : request.getCantidadAjuste();
-
+                ? -request.getCantidadAjuste() : request.getCantidadAjuste();
         int nueva = inv.getCantidadActual() + ajuste;
         if (nueva < 0) throw new BusinessException("El ajuste resultaría en cantidad negativa.");
-
         inv.setCantidadActual(nueva);
         inv.setObservaciones(String.format("[AJUSTE %s] %d uds. Motivo: %s",
                 request.getTipoAjuste(), Math.abs(ajuste), request.getMotivo()));
@@ -232,30 +218,20 @@ public class InventarioCentralService {
         CatalogoEpp epp = inv.getEpp();
         return InventarioCentralResponseDTO.builder()
                 .inventarioId(inv.getInventarioCentralId())
-                .eppId(epp.getEppId())
-                .eppNombre(epp.getNombreEpp())
-                .tipoUso(epp.getTipoUso())
+                .eppId(epp.getEppId()).eppNombre(epp.getNombreEpp()).tipoUso(epp.getTipoUso())
                 .tallaId(inv.getTalla() != null ? inv.getTalla().getTallaId() : null)
                 .tallaNombre(inv.getTalla() != null ? inv.getTalla().getNombre() : null)
-                .estadoId(inv.getEstado().getEstadoId())
-                .estadoNombre(inv.getEstado().getNombre())
-                .estadoPermiteUso(inv.getEstado().getPermiteUso())
-                .estadoColorHex(inv.getEstado().getColorHex())
+                .estadoId(inv.getEstado().getEstadoId()).estadoNombre(inv.getEstado().getNombre())
+                .estadoPermiteUso(inv.getEstado().getPermiteUso()).estadoColorHex(inv.getEstado().getColorHex())
                 .cantidadActual(inv.getCantidadActual())
-                .cantidadMinima(epp.getCantidadMinima())
-                .cantidadMaxima(epp.getCantidadMaxima())
-                .ubicacionBodega(inv.getUbicacionBodega())
-                .lote(inv.getLote())
-                .fechaAdquisicion(inv.getFechaAdquisicion())
-                .costoUnitario(inv.getCostoUnitario())
-                .proveedor(inv.getProveedor())
-                .fechaVencimiento(inv.getFechaVencimiento())
-                .observaciones(inv.getObservaciones())
-                .ultimaActualizacion(inv.getUltimaActualizacion())
+                .cantidadMinima(epp.getCantidadMinima()).cantidadMaxima(epp.getCantidadMaxima())
+                .ubicacionBodega(inv.getUbicacionBodega()).lote(inv.getLote())
+                .fechaAdquisicion(inv.getFechaAdquisicion()).costoUnitario(inv.getCostoUnitario())
+                .proveedor(inv.getProveedor()).fechaVencimiento(inv.getFechaVencimiento())
+                .observaciones(inv.getObservaciones()).ultimaActualizacion(inv.getUltimaActualizacion())
                 .necesitaReposicion(inv.necesitaReposicion())
                 .diasParaVencer(inv.getFechaVencimiento() != null
-                        ? (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), inv.getFechaVencimiento())
-                        : null)
+                        ? (int) ChronoUnit.DAYS.between(LocalDate.now(), inv.getFechaVencimiento()) : null)
                 .build();
     }
 }

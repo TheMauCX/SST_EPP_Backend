@@ -17,7 +17,7 @@ public class CatalogoEppRequestDTO {
     private TipoUso tipoUso;
 
     // Ficha técnica
-    @Size(max = 255) private String aprobacionesNormas;
+    @Size(max = 255) private String aprobacionesNormas;  // legacy, opcional
     private String caracteristicas;
     @Size(max = 100) private String fabricante;
     @Size(max = 150) private String tiempoUsoFabricante;
@@ -31,10 +31,11 @@ public class CatalogoEppRequestDTO {
     // Tallas
     private Set<Integer> tallaIds;
 
-    // Umbrales de stock (sprint 4b — movidos desde inventarios)
-    @Min(value = 0, message = "La cantidad mínima no puede ser negativa")
-    private Integer cantidadMinima;
+    // Normas (Sprint 5 — HU-18)
+    /** IDs de las normas a asociar. Se muestran como chips en la UI. */
+    private Set<Integer> normaIds;
 
-    @Min(value = 0, message = "La cantidad máxima no puede ser negativa")
-    private Integer cantidadMaxima;
+    // Umbrales de stock
+    @Min(0) private Integer cantidadMinima;
+    @Min(0) private Integer cantidadMaxima;
 }

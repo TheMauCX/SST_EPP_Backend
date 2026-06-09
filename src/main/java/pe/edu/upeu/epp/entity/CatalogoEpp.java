@@ -13,9 +13,9 @@ import java.util.Set;
 /**
  * Catálogo de tipos de EPP.
  *
- * Sprint 4b:
- *   - cantidadMinima y cantidadMaxima se mueven aquí desde InventarioCentral/InventarioArea.
- *     Son umbrales de alerta de stock propios del tipo de EPP, no del lote/área.
+ * Sprint 5: se agrega relación ManyToMany con NormaEpp.
+ * Se elimina el campo texto libre aprobacionesNormas (reemplazado por la relación).
+ * Se mantiene aprobacionesNormas como campo legacy nullable por compatibilidad.
  */
 @Entity
 @Table(name = "catalogo_epp", schema = "epp", indexes = {
@@ -37,6 +37,7 @@ public class CatalogoEpp {
 
     // ── Ficha Técnica ────────────────────────────────────────────────────────
 
+    /** Campo legacy — reemplazado por la relación normasAplicables. Se mantiene nullable. */
     @Column(name = "aprobaciones_normas", length = 255)
     private String aprobacionesNormas;
 
@@ -70,21 +71,12 @@ public class CatalogoEpp {
     @Column(name = "color", length = 60)
     private String color;
 
-    // ── Umbrales de stock (antes estaban en inventario_central e inventario_area) ─
+    // ── Umbrales de stock ────────────────────────────────────────────────────
 
-    /**
-     * Cantidad mínima de alerta para este tipo de EPP.
-     * Si el stock en central o área cae a este nivel, se activa la alerta.
-     * Sprint 4b: migrado desde inventario_central / inventario_area.
-     */
     @Min(0)
     @Column(name = "cantidad_minima", nullable = false)
     private Integer cantidadMinima = 0;
 
-    /**
-     * Cantidad máxima recomendada en stock para este tipo de EPP.
-     * Opcional; se usa para calcular el porcentaje de stock.
-     */
     @Min(0)
     @Column(name = "cantidad_maxima")
     private Integer cantidadMaxima;
@@ -100,6 +92,22 @@ public class CatalogoEpp {
     )
     @Builder.Default
     private Set<CatalogoTalla> tallasDisponibles = new HashSet<>();
+
+    // ── Normas aplicables (Sprint 5 — HU-18) ─────────────────────────────────
+
+    /**
+     * Normas de seguridad que certifica o cumple este EPP.
+     * En la UI se muestra como chips seleccionables con desplegable de detalle.
+     */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "catalogo_epp_norma",
+            schema = "epp",
+            joinColumns        = @JoinColumn(name = "epp_id"),
+            inverseJoinColumns = @JoinColumn(name = "norma_id")
+    )
+    @Builder.Default
+    private Set<NormaEpp> normасAplicables = new HashSet<>();
 
     // ── Auditoría ────────────────────────────────────────────────────────────
 

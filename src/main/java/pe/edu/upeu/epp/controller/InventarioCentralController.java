@@ -1,7 +1,6 @@
 package pe.edu.upeu.epp.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,21 +32,19 @@ public class InventarioCentralController {
     private final InventarioCentralService inventarioCentralService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Registrar stock manual")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','SUPERVISOR_SST')")
     public ResponseEntity<InventarioCentralResponseDTO> crear(@Valid @RequestBody InventarioCentralRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(inventarioCentralService.crear(request));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener por ID")
     public ResponseEntity<InventarioCentralResponseDTO> obtenerPorId(@PathVariable Integer id) {
         return ResponseEntity.ok(inventarioCentralService.obtenerPorId(id));
     }
 
     @GetMapping
-    @Operation(summary = "Listar inventario",
-               description = "Filtros: sort=alpha | filter=low_stock (combinables)")
+    @Operation(summary = "Listar inventario (plano, paginado)",
+               description = "Parámetros opcionales: sort=alpha | filter=low_stock")
     public ResponseEntity<Page<InventarioCentralResponseDTO>> listar(
             @PageableDefault(size = 20, sort = "ultimaActualizacion", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) String sort,
@@ -55,48 +52,41 @@ public class InventarioCentralController {
         return ResponseEntity.ok(inventarioCentralService.listarTodos(pageable, sort, filter));
     }
 
-    /**
-     * Vista agrupada: agrupa registros con mismo (epp, proveedor, lote)
-     * mostrando todas las tallas con sus cantidades y precios en un solo objeto.
-     */
     @GetMapping("/agrupado")
     @Operation(
-            summary = "Inventario agrupado por EPP + lote + proveedor",
-            description = "Consolida en un solo objeto todos los registros de un mismo " +
-                    "EPP comprado en el mismo lote y proveedor, listando cada talla " +
-                    "con su cantidad y costo unitario.")
-    public ResponseEntity<List<InventarioAgrupadoResponseDTO>> listarAgrupado() {
-        return ResponseEntity.ok(inventarioCentralService.listarAgrupado());
+            summary = "Inventario agrupado (paginado)",
+            description = "Consolida registros por EPP+lote+proveedor. " +
+                    "Cada objeto incluye detallesPorTalla con cantidad y costo unitario por talla. " +
+                    "Soporta paginación estándar: ?page=0&size=10")
+    public ResponseEntity<Page<InventarioAgrupadoResponseDTO>> listarAgrupado(
+            @PageableDefault(size = 10, sort = "eppNombre") Pageable pageable) {
+        return ResponseEntity.ok(inventarioCentralService.listarAgrupadoPaginado(pageable));
     }
 
     @GetMapping("/epp/{eppId}")
-    @Operation(summary = "Listar por EPP")
     public ResponseEntity<List<InventarioCentralResponseDTO>> listarPorEpp(@PathVariable Integer eppId) {
         return ResponseEntity.ok(inventarioCentralService.listarPorEpp(eppId));
     }
 
     @GetMapping("/alertas/stock-bajo")
-    @Operation(summary = "Alertas de stock bajo")
-    public ResponseEntity<List<InventarioCentralResponseDTO>> listarStockBajo() {
+    public ResponseEntity<List<InventarioCentralResponseDTO>> stockBajo() {
         return ResponseEntity.ok(inventarioCentralService.listarStockBajo());
     }
 
     @GetMapping("/alertas/proximos-vencer")
-    @Operation(summary = "Alertas de vencimiento (30 días)")
-    public ResponseEntity<List<InventarioCentralResponseDTO>> listarProximosAVencer() {
+    public ResponseEntity<List<InventarioCentralResponseDTO>> proximosAVencer() {
         return ResponseEntity.ok(inventarioCentralService.listarProximosAVencer());
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(summary = "Actualizar inventario")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','SUPERVISOR_SST')")
     public ResponseEntity<InventarioCentralResponseDTO> actualizar(
             @PathVariable Integer id, @Valid @RequestBody InventarioCentralUpdateDTO request) {
         return ResponseEntity.ok(inventarioCentralService.actualizar(id, request));
     }
 
     @PatchMapping("/{id}/ajustar")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA','SUPERVISOR_SST')")
     @Operation(summary = "Ajuste manual de stock (INGRESO/SALIDA)")
     public ResponseEntity<InventarioCentralResponseDTO> ajustarStock(
             @PathVariable Integer id, @Valid @RequestBody AjusteInventarioDTO request) {
@@ -105,7 +95,6 @@ public class InventarioCentralController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
-    @Operation(summary = "Eliminar (solo si cantidad = 0)")
     public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         inventarioCentralService.eliminar(id);
         return ResponseEntity.noContent().build();

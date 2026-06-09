@@ -10,7 +10,7 @@ import java.util.Set;
 public class CatalogoEppResponseDTO {
 
     private Integer eppId;
-    private String nombreEpp;
+    private String  nombreEpp;
     private TipoUso tipoUso;
 
     // Ficha técnica
@@ -29,12 +29,16 @@ public class CatalogoEppResponseDTO {
     // Tallas
     private Set<CatalogoTallaResponseDTO> tallasDisponibles;
 
-    // Umbrales de stock (sprint 4b)
+    // Normas aplicables (Sprint 5)
+    /** Lista de normas para mostrar como chips con desplegable en la UI. */
+    private Set<NormaEppResponseDTO> normasAplicables;
+
+    // Umbrales de stock
     private Integer cantidadMinima;
     private Integer cantidadMaxima;
 
     // Auditoría
-    private Boolean activo;
+    private Boolean       activo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
 }

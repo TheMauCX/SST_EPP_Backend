@@ -20,9 +20,12 @@ public class CatalogoEppUpdateDTO {
     private String condicionesAlmacenamiento;
     private String condicionesCambioPrematuro;
     @Size(max = 500) private String fotoReferencia;
-    private Boolean activo;
     @Size(max = 60)  private String color;
+    private Boolean activo;
     private Set<Integer> tallaIds;
+
+    /** Reemplaza completamente las normas asociadas. Enviar null para no modificar. */
+    private Set<Integer> normaIds;
 
     @Min(0) private Integer cantidadMinima;
     @Min(0) private Integer cantidadMaxima;
