@@ -15,10 +15,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import pe.edu.upeu.epp.dto.request.CompraRequestDTO;
+import pe.edu.upeu.epp.dto.response.CompraDocumentosDTO;
 import pe.edu.upeu.epp.entity.Compra;
 import pe.edu.upeu.epp.service.CompraService;
 
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/compras")
@@ -32,18 +34,10 @@ public class CompraController {
 
     /**
      * Registra una compra.
-     *
-     * Multipart keys:
-     *   compraData        → JSON obligatorio
-     *   facturaArchivo    → archivo de factura (opcional)
-     *   cotizacionArchivo → archivo de cotización (opcional, sprint 4b)
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMINISTRADOR_SISTEMA', 'SUPERVISOR_SST')")
-    @Operation(
-            summary = "Registrar compra",
-            description = "Registra una factura, actualiza el inventario central. " +
-                    "Acepta opcionalmente el archivo de factura y/o cotización.")
+    @Operation(summary = "Registrar compra")
     public ResponseEntity<?> registrarCompra(
             @RequestPart("compraData") String compraDataJson,
             @RequestPart(value = "facturaArchivo",    required = false) MultipartFile facturaArchivo,
@@ -62,14 +56,44 @@ public class CompraController {
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "mensaje",       "Compra registrada e inventario actualizado exitosamente",
                     "compraId",      compra.getCompraId(),
-                    "urlFactura",    compra.getRutaArchivoFactura()   != null ? compra.getRutaArchivoFactura()   : "No se subió factura",
-                    "urlCotizacion", compra.getRutaArchivoCotizacion() != null ? compra.getRutaArchivoCotizacion() : "No se subió cotización",
+                    "urlFactura",    compra.getRutaArchivoFactura()    != null ? compra.getRutaArchivoFactura()    : "",
+                    "urlCotizacion", compra.getRutaArchivoCotizacion() != null ? compra.getRutaArchivoCotizacion() : "",
                     "subtotal",      compra.getSubtotal(),
                     "igv",           compra.getIgv(),
                     "totalGastado",  compra.getMontoTotal()
             ));
         } catch (Exception e) {
             log.error("Error en registro de compra: ", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * NUEVO: Buscar documentos (factura + cotización) de una compra por número de factura/lote.
+     *
+     * El lote en inventario_central coincide exactamente con nro_factura de la compra,
+     * porque CompraService asigna: lote = request.getNroFactura().
+     *
+     * GET /api/v1/compras/documentos?nroFactura={lote}
+     * Retorna: { compraId, nroFactura, proveedor, fechaCompra,
+     *            urlFactura, urlCotizacion, subtotal, igv, montoTotal }
+     */
+    @GetMapping("/documentos")
+    @Operation(
+            summary = "Buscar documentos de compra por N° factura",
+            description = "Retorna las URLs de factura y cotización de una compra identificada " +
+                    "por su número de factura. El número de factura coincide con el campo " +
+                    "'lote' del inventario central.")
+    public ResponseEntity<?> obtenerDocumentos(
+            @RequestParam String nroFactura) {
+        try {
+            Optional<CompraDocumentosDTO> resultado =
+                    compraService.buscarDocumentosPorNroFactura(nroFactura);
+            return resultado
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            log.error("Error al buscar documentos de compra: ", e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

@@ -49,12 +49,12 @@ INSERT INTO epp.rol (nombre_rol, descripcion) VALUES
 ('ADMINISTRADOR_SISTEMA','Administrador con acceso total al sistema');
 
 -- ============================================================
--- 2. USUARIOS (pass: Admin1234! en BCrypt)
+-- 2. USUARIOS (pass: hash personalizado en BCrypt)
 -- ============================================================
 INSERT INTO epp.usuario (nombre_usuario, contrasena_hash, email, nombre_completo, activo, fecha_creacion, intentos_fallidos) VALUES
-('supervisor1', '$2a$10$N.zmdr9zkMhJBjyQZcS7uOoFfuuHZY5dglEFGrJE2b2RNXyOqbXzm', 'supervisor1@upeu.edu.pe', 'Carlos Mendoza Huanca',  TRUE, NOW(), 0),
-('supervisor2', '$2a$10$N.zmdr9zkMhJBjyQZcS7uOoFfuuHZY5dglEFGrJE2b2RNXyOqbXzm', 'supervisor2@upeu.edu.pe', 'María Quispe Flores',    TRUE, NOW(), 0),
-('admin',       '$2a$10$N.zmdr9zkMhJBjyQZcS7uOoFfuuHZY5dglEFGrJE2b2RNXyOqbXzm', 'admin@upeu.edu.pe',       'Administrador del Sistema', TRUE, NOW(), 0);
+('supervisor1', '$2a$10$243diXrCbbBqf.UDNnQAiOUDfDlxYZkiRpsUW9DKz0g6joYj/IQcq.', 'supervisor1@upeu.edu.pe', 'Carlos Mendoza Huanca',  TRUE, NOW(), 0),
+('supervisor2', '$2a$10$243diXrCbbBqf.UDNnQAiOUDfDlxYZkiRpsUW9DKz0g6joYj/IQcq.', 'supervisor2@upeu.edu.pe', 'María Quispe Flores',    TRUE, NOW(), 0),
+('admin',       '$2a$10$243diXrCbbBqf.UDNnQAiOUDfDlxYZkiRpsUW9DKz0g6joYj/IQcq.', 'admin@upeu.edu.pe',       'Administrador del Sistema', TRUE, NOW(), 0);
 
 -- Asignar roles
 INSERT INTO epp.usuario_rol (usuario_id, rol_id) VALUES
@@ -571,15 +571,15 @@ INSERT INTO epp.inventario_area (epp_id, area_id, estado_id, talla_id, cantidad_
 
 -- ============================================================
 -- 14. ENTREGAS EPP
---     Distribuidas entre Oct 2024 y Abr 2025 para tendencias
+--     Distribuidas entre Oct 2026 y Abr 2026 para tendencias
 --     Supervisor 1 (usuario_id=1) y Supervisor 2 (usuario_id=2)
 -- ============================================================
 
--- ── OCTUBRE 2024 ────────────────────────────────────────────
+-- ── OCTUBRE 2026 ────────────────────────────────────────────
 
 -- Entrega 1: Dotación inicial Mantenimiento (Oct 2024)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(1, 1, '2024-10-05 09:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial - Área Mantenimiento', 'COMPLETADA');
+(1, 1, '2026-10-05 09:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial - Área Mantenimiento', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (1, 1, 3, 1, 'PRIMERA_ENTREGA'),   -- Casco M
 (1, 2, 11, 1, 'PRIMERA_ENTREGA'),  -- Bota 41
@@ -588,7 +588,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 2: Pedro Mamani
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(2, 1, '2024-10-05 09:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial', 'COMPLETADA');
+(2, 1, '2026-10-05 09:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (2, 1, 4, 1, 'PRIMERA_ENTREGA'),
 (2, 2, 10, 1, 'PRIMERA_ENTREGA'),
@@ -597,7 +597,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 3: José Huanca
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(3, 1, '2024-10-06 08:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial técnico plomería', 'COMPLETADA');
+(3, 1, '2026-10-06 08:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial técnico plomería', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (3, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (3, 5, 15, 1, 'PRIMERA_ENTREGA'),
@@ -605,7 +605,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 4: Dotación inicial Limpieza
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(7, 2, '2024-10-08 08:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial - Área Limpieza', 'COMPLETADA');
+(7, 2, '2026-10-08 08:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial - Área Limpieza', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (4, 8, 3, 1, 'PRIMERA_ENTREGA'),   -- Chaleco M
 (4, 12, NULL, 5, 'PRIMERA_ENTREGA'), -- Mascarillas quirúrgicas
@@ -613,7 +613,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 5: Rosa Ticona
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(8, 2, '2024-10-08 08:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial', 'COMPLETADA');
+(8, 2, '2026-10-08 08:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (5, 8, 4, 1, 'PRIMERA_ENTREGA'),
 (5, 12, NULL, 5, 'PRIMERA_ENTREGA'),
@@ -621,7 +621,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 6: Laboratorios dotación inicial Carlos Lupaca
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(13, 1, '2024-10-10 10:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial laboratorios', 'COMPLETADA');
+(13, 1, '2026-10-10 10:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial laboratorios', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (6, 5, 15, 1, 'PRIMERA_ENTREGA'),  -- Lentes
 (6, 7, 15, 1, 'PRIMERA_ENTREGA'),  -- Careta
@@ -630,7 +630,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 7: Cocina Elena Catacora
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(18, 2, '2024-10-12 07:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial cocina', 'COMPLETADA');
+(18, 2, '2026-10-12 07:30:00', 'PRIMERA_ENTREGA', 'Dotación inicial cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (7, 10, NULL, 5, 'PRIMERA_ENTREGA'),  -- Guante nitrilo
 (7, 12, NULL, 5, 'PRIMERA_ENTREGA'),  -- Mascarilla quirúrgica
@@ -638,18 +638,18 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 8: Construcción Máximo Calizaya
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(25, 1, '2024-10-15 07:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial obra', 'COMPLETADA');
+(25, 1, '2026-10-15 07:00:00', 'PRIMERA_ENTREGA', 'Dotación inicial obra', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (8, 1, 3, 1, 'PRIMERA_ENTREGA'),   -- Casco M
 (8, 2, 12, 1, 'PRIMERA_ENTREGA'),  -- Bota 42
 (8, 5, 15, 1, 'PRIMERA_ENTREGA'),  -- Lentes
 (8, 9, NULL, 3, 'PRIMERA_ENTREGA'); -- Mascarilla N95
 
--- ── NOVIEMBRE 2024 ──────────────────────────────────────────
+-- ── NOVIEMBRE 2026 ──────────────────────────────────────────
 
 -- Entrega 9: Wilfredo Puma (soldador) — primera dotación
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(5, 1, '2024-11-05 08:00:00', 'PRIMERA_ENTREGA', 'Kit soldador completo', 'COMPLETADA');
+(5, 1, '2026-11-05 08:00:00', 'PRIMERA_ENTREGA', 'Kit soldador completo', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (9, 1, 4, 1, 'PRIMERA_ENTREGA'),   -- Casco L
 (9, 3, 4, 1, 'PRIMERA_ENTREGA'),   -- Guante cuero L
@@ -658,7 +658,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 10: Carmen Villca (limpieza senior)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(9, 2, '2024-11-08 08:00:00', 'PRIMERA_ENTREGA', 'Dotación supervisora limpieza', 'COMPLETADA');
+(9, 2, '2026-11-08 08:00:00', 'PRIMERA_ENTREGA', 'Dotación supervisora limpieza', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (10, 8, 3, 1, 'PRIMERA_ENTREGA'),
 (10, 12, NULL, 10, 'PRIMERA_ENTREGA'),
@@ -666,7 +666,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 11: Reposición Mantenimiento Edwin Ccoa
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(4, 1, '2024-11-10 09:00:00', 'PRIMERA_ENTREGA', 'Primera dotación auxiliar', 'COMPLETADA');
+(4, 1, '2026-11-10 09:00:00', 'PRIMERA_ENTREGA', 'Primera dotación auxiliar', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (11, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (11, 5, 15, 1, 'PRIMERA_ENTREGA'),
@@ -674,7 +674,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 12: Sandra Flores (laboratorio)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(14, 1, '2024-11-12 10:00:00', 'PRIMERA_ENTREGA', 'Asistente lab nueva dotación', 'COMPLETADA');
+(14, 1, '2026-11-12 10:00:00', 'PRIMERA_ENTREGA', 'Asistente lab nueva dotación', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (12, 5, 15, 1, 'PRIMERA_ENTREGA'),
 (12, 9, NULL, 3, 'PRIMERA_ENTREGA'),
@@ -682,16 +682,16 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 13: Gloria Callata (cocina)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(19, 2, '2024-11-15 07:00:00', 'PRIMERA_ENTREGA', 'Dotación cocinera', 'COMPLETADA');
+(19, 2, '2026-11-15 07:00:00', 'PRIMERA_ENTREGA', 'Dotación cocinera', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (13, 10, NULL, 5, 'PRIMERA_ENTREGA'),
 (13, 12, NULL, 5, 'PRIMERA_ENTREGA');
 
--- ── DICIEMBRE 2024 ──────────────────────────────────────────
+-- ── DICIEMBRE 2026 ──────────────────────────────────────────
 
 -- Entrega 14: Julio Tapia (construcción)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(26, 1, '2024-12-03 07:00:00', 'PRIMERA_ENTREGA', 'Operario construcción dotación', 'COMPLETADA');
+(26, 1, '2026-12-03 07:00:00', 'PRIMERA_ENTREGA', 'Operario construcción dotación', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (14, 1, 4, 1, 'PRIMERA_ENTREGA'),
 (14, 2, 9, 1, 'PRIMERA_ENTREGA'),
@@ -700,7 +700,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 15: Patricia Humpiri (cocina)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(20, 2, '2024-12-05 07:30:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar cocina', 'COMPLETADA');
+(20, 2, '2026-12-05 07:30:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (15, 10, NULL, 5, 'PRIMERA_ENTREGA'),
 (15, 12, NULL, 5, 'PRIMERA_ENTREGA'),
@@ -708,24 +708,24 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 16: Reposición mascarillas Laboratorio Marco Calla
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(15, 1, '2024-12-10 09:00:00', 'REPOSICION', 'Reposición mensual consumibles lab', 'COMPLETADA');
+(15, 1, '2026-12-10 09:00:00', 'REPOSICION', 'Reposición mensual consumibles lab', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (16, 9, NULL, 3, 'REPOSICION'),
 (16, 10, NULL, 10, 'REPOSICION');
 
 -- Entrega 17: Reposición guantes limpieza Silvia Apaza
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(10, 2, '2024-12-12 08:00:00', 'PRIMERA_ENTREGA', 'Nueva operaria limpieza', 'COMPLETADA');
+(10, 2, '2026-12-12 08:00:00', 'PRIMERA_ENTREGA', 'Nueva operaria limpieza', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (17, 8, 3, 1, 'PRIMERA_ENTREGA'),
 (17, 12, NULL, 5, 'PRIMERA_ENTREGA'),
 (17, 13, NULL, 2, 'PRIMERA_ENTREGA');
 
--- ── ENERO 2025 ──────────────────────────────────────────────
+-- ── ENERO 2026 ──────────────────────────────────────────────
 
 -- Entrega 18: Fredy Mamani (albañil) — kit obra
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(27, 1, '2025-01-10 07:00:00', 'PRIMERA_ENTREGA', 'Albañil oficial dotación completa', 'COMPLETADA');
+(27, 1, '2026-01-10 07:00:00', 'PRIMERA_ENTREGA', 'Albañil oficial dotación completa', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (18, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (18, 2, 12, 1, 'PRIMERA_ENTREGA'),
@@ -735,7 +735,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 19: Roberto Alave (nuevo electricista)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(6, 1, '2025-01-12 08:30:00', 'PRIMERA_ENTREGA', 'Nuevo técnico electricista jr', 'COMPLETADA');
+(6, 1, '2026-01-12 08:30:00', 'PRIMERA_ENTREGA', 'Nuevo técnico electricista jr', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (19, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (19, 5, 15, 1, 'PRIMERA_ENTREGA'),
@@ -744,23 +744,23 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 20: Reposición mensual cocina — Elena Catacora
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(18, 2, '2025-01-15 07:00:00', 'REPOSICION', 'Reposición mensual consumibles cocina', 'COMPLETADA');
+(18, 2, '2026-01-15 07:00:00', 'REPOSICION', 'Reposición mensual consumibles cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (20, 10, NULL, 5, 'REPOSICION'),
 (20, 12, NULL, 5, 'REPOSICION');
 
 -- Entrega 21: Victor Tito (lab senior) reposición
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(17, 1, '2025-01-20 10:00:00', 'REPOSICION', 'Reposición consumibles técnico senior', 'COMPLETADA');
+(17, 1, '2026-01-20 10:00:00', 'REPOSICION', 'Reposición consumibles técnico senior', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (21, 9, NULL, 3, 'REPOSICION'),
 (21, 10, NULL, 10, 'REPOSICION');
 
--- ── FEBRERO 2025 ────────────────────────────────────────────
+-- ── FEBRERO 2026 ────────────────────────────────────────────
 
 -- Entrega 22: Nancy Sánchez (cocina)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(21, 2, '2025-02-03 07:30:00', 'PRIMERA_ENTREGA', 'Dotación auxiliar cocina', 'COMPLETADA');
+(21, 2, '2026-02-03 07:30:00', 'PRIMERA_ENTREGA', 'Dotación auxiliar cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (22, 10, NULL, 5, 'PRIMERA_ENTREGA'),
 (22, 12, NULL, 5, 'PRIMERA_ENTREGA'),
@@ -768,7 +768,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 23: Raúl Huanca (obra)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(28, 1, '2025-02-05 07:00:00', 'PRIMERA_ENTREGA', 'Nuevo ayudante albañil', 'COMPLETADA');
+(28, 1, '2026-02-05 07:00:00', 'PRIMERA_ENTREGA', 'Nuevo ayudante albañil', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (23, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (23, 8, 4, 1, 'PRIMERA_ENTREGA'),
@@ -776,31 +776,31 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 24: Reposición mascarillas limpieza — Carmen Villca
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(9, 2, '2025-02-10 08:00:00', 'REPOSICION', 'Reposición mensual limpieza', 'COMPLETADA');
+(9, 2, '2026-02-10 08:00:00', 'REPOSICION', 'Reposición mensual limpieza', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (24, 12, NULL, 10, 'REPOSICION'),
 (24, 13, NULL, 3, 'REPOSICION');
 
 -- Entrega 25: Diana Sucasaca (lab)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(16, 1, '2025-02-12 10:00:00', 'PRIMERA_ENTREGA', 'Nueva asistente laboratorio', 'COMPLETADA');
+(16, 1, '2026-02-12 10:00:00', 'PRIMERA_ENTREGA', 'Nueva asistente laboratorio', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (25, 5, 15, 1, 'PRIMERA_ENTREGA'),
 (25, 9, NULL, 3, 'PRIMERA_ENTREGA'),
 (25, 10, NULL, 5, 'PRIMERA_ENTREGA');
 
--- ── MARZO 2025 ──────────────────────────────────────────────
+-- ── MARZO 2026 ──────────────────────────────────────────────
 
 -- Entrega 26: Reposición Juan Quispe (limpieza)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(11, 2, '2025-03-05 08:00:00', 'REPOSICION', 'Reposición guantes desgastados', 'COMPLETADA');
+(11, 2, '2026-03-05 08:00:00', 'REPOSICION', 'Reposición guantes desgastados', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (26, 12, NULL, 10, 'REPOSICION'),
 (26, 13, NULL, 3, 'REPOSICION');
 
 -- Entrega 27: Bruno Apaza (obra senior) reposición
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(29, 1, '2025-03-08 07:00:00', 'REPOSICION', 'Reposición cascos desgastados obra', 'COMPLETADA');
+(29, 1, '2026-03-08 07:00:00', 'REPOSICION', 'Reposición cascos desgastados obra', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (27, 1, 4, 1, 'REPOSICION'),
 (27, 5, 15, 1, 'REPOSICION'),
@@ -808,38 +808,38 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 28: Reposición mascarillas N95 Mantenimiento Luis Condori
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(2, 1, '2025-03-10 09:00:00', 'REPOSICION', 'Reposición trimestral mantenimiento', 'COMPLETADA');
+(2, 1, '2026-03-10 09:00:00', 'REPOSICION', 'Reposición trimestral mantenimiento', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (28, 9, NULL, 3, 'REPOSICION'),
 (28, 11, NULL, 5, 'REPOSICION');
 
 -- Entrega 29: Reposición cocina Gloria Callata
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(19, 2, '2025-03-15 07:30:00', 'REPOSICION', 'Reposición mensual', 'COMPLETADA');
+(19, 2, '2026-03-15 07:30:00', 'REPOSICION', 'Reposición mensual', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (29, 10, NULL, 5, 'REPOSICION'),
 (29, 12, NULL, 5, 'REPOSICION');
 
 -- Entrega 30: Nelly Quispe (obra nueva trabajadora)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(30, 1, '2025-03-20 07:00:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar de obra', 'COMPLETADA');
+(30, 1, '2026-03-20 07:00:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar de obra', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (30, 1, 3, 1, 'PRIMERA_ENTREGA'),
 (30, 8, 3, 1, 'PRIMERA_ENTREGA'),
 (30, 9, NULL, 3, 'PRIMERA_ENTREGA');
 
--- ── ABRIL 2025 ──────────────────────────────────────────────
+-- ── ABRIL 2026 ──────────────────────────────────────────────
 
 -- Entrega 31: Reposición completa laboratorio Victor Tito
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(17, 1, '2025-04-05 10:00:00', 'REPOSICION', 'Reposición trimestral laboratorio', 'COMPLETADA');
+(17, 1, '2026-04-05 10:00:00', 'REPOSICION', 'Reposición trimestral laboratorio', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (31, 9, NULL, 3, 'REPOSICION'),
 (31, 10, NULL, 10, 'REPOSICION');
 
 -- Entrega 32: Hugo Pinto (ayudante cocina)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(23, 2, '2025-04-08 07:30:00', 'PRIMERA_ENTREGA', 'Nuevo ayudante cocina', 'COMPLETADA');
+(23, 2, '2026-04-08 07:30:00', 'PRIMERA_ENTREGA', 'Nuevo ayudante cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (32, 10, NULL, 5, 'PRIMERA_ENTREGA'),
 (32, 12, NULL, 5, 'PRIMERA_ENTREGA'),
@@ -847,7 +847,7 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 33: Emergencia — Obra Civil
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(27, 1, '2025-04-10 07:00:00', 'EMERGENCIA', 'Reposición urgente por deterioro acelerado', 'COMPLETADA');
+(27, 1, '2026-04-10 07:00:00', 'EMERGENCIA', 'Reposición urgente por deterioro acelerado', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (33, 1, 3, 1, 'REPOSICION'),
 (33, 6, 15, 1, 'REPOSICION'),
@@ -855,14 +855,14 @@ INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, mot
 
 -- Entrega 34: Elsa Ramos (cocina)
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(24, 2, '2025-04-12 07:30:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar cocina', 'COMPLETADA');
+(24, 2, '2026-04-12 07:30:00', 'PRIMERA_ENTREGA', 'Nueva auxiliar cocina', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (34, 10, NULL, 5, 'PRIMERA_ENTREGA'),
 (34, 12, NULL, 5, 'PRIMERA_ENTREGA');
 
 -- Entrega 35: Reposición mascarillas cocina Lucía Vargas
 INSERT INTO epp.entrega_epp (trabajador_id, supervisor_usuario_id, fecha_entrega, tipo_entrega, observaciones, status) VALUES
-(22, 2, '2025-04-15 07:00:00', 'REPOSICION', 'Reposición cocinera senior', 'COMPLETADA');
+(22, 2, '2026-04-15 07:00:00', 'REPOSICION', 'Reposición cocinera senior', 'COMPLETADA');
 INSERT INTO epp.detalle_entrega_epp (entrega_id, epp_id, talla_id, cantidad, motivo) VALUES
 (35, 10, NULL, 5, 'REPOSICION'),
 (35, 12, NULL, 5, 'REPOSICION'),
@@ -915,7 +915,7 @@ BEGIN
   RAISE NOTICE '║  Entregas:            %              ║', LPAD(v_entregas::TEXT, 3, ' ');
   RAISE NOTICE '║  Detalles entrega:    %              ║', LPAD(v_det_entregas::TEXT, 3, ' ');
   RAISE NOTICE '╠══════════════════════════════════════╣';
-  RAISE NOTICE '║  Credenciales (todos): Admin1234!    ║';
+  RAISE NOTICE '║  Credenciales (todos): hash custom   ║';
   RAISE NOTICE '║  Usuarios: supervisor1, supervisor2, ║';
   RAISE NOTICE '║            admin                     ║';
   RAISE NOTICE '╚══════════════════════════════════════╝';

@@ -37,13 +37,13 @@ server:
     include-message: always
     include-stacktrace: on_param
 
-logging:
-  level:
-    root: INFO
-    pe.edu.upeu.epp: DEBUG
-    org.hibernate.SQL: DEBUG
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%profile] - %msg%n"
+#logging:
+#  level:
+#    root: INFO
+#    pe.edu.upeu.epp: DEBUG
+#    org.hibernate.SQL: DEBUG
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} [%profile] - %msg%n"
 
 springdoc:
   api-docs:

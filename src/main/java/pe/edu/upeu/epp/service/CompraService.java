@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import pe.edu.upeu.epp.dto.request.CompraRequestDTO;
 import pe.edu.upeu.epp.dto.request.DetalleCompraRequestDTO;
+import pe.edu.upeu.epp.dto.response.CompraDocumentosDTO;
 import pe.edu.upeu.epp.entity.*;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.*;
@@ -42,13 +43,11 @@ public class CompraService {
         Usuario usuario = usuarioRepository.findByNombreUsuario(username)
                 .orElseThrow(() -> new BusinessException("Usuario no encontrado: " + username));
 
-        // Factura (existente)
         String rutaFactura = null;
         if (archivoFactura != null && !archivoFactura.isEmpty()) {
             rutaFactura = azureStorageService.subirFactura(archivoFactura, request.getNroFactura());
         }
 
-        // Cotización (nuevo, opcional)
         String rutaCotizacion = null;
         if (archivoCotizacion != null && !archivoCotizacion.isEmpty()) {
             rutaCotizacion = azureStorageService.subirCotizacion(archivoCotizacion, request.getNroFactura());
@@ -58,7 +57,6 @@ public class CompraService {
         EstadoEpp estadoEnStock = estadoEppRepository.findByNombre("EN_STOCK")
                 .orElseThrow(() -> new BusinessException("Estado EN_STOCK no configurado."));
 
-        // Calcular totales con IGV
         BigDecimal montoTotal = BigDecimal.ZERO;
         for (DetalleCompraRequestDTO item : request.getItems()) {
             montoTotal = montoTotal.add(
@@ -93,7 +91,7 @@ public class CompraService {
 
                 if (!epp.getTallasDisponibles().isEmpty()
                         && epp.getTallasDisponibles().stream()
-                               .noneMatch(t -> t.getTallaId().equals(itemDTO.getTallaId()))) {
+                        .noneMatch(t -> t.getTallaId().equals(itemDTO.getTallaId()))) {
                     throw new BusinessException(String.format(
                             "La talla '%s' no está configurada para el EPP '%s'.",
                             talla.getNombre(), epp.getNombreEpp()));
@@ -117,17 +115,44 @@ public class CompraService {
         return compraRepository.save(compra);
     }
 
+    // ── NUEVO MÉTODO ─────────────────────────────────────────────────────────
+
+    /**
+     * Busca los documentos (factura + cotización) de una compra por su número de factura.
+     * El número de factura coincide con el campo "lote" del inventario central.
+     *
+     * @param nroFactura Número de factura / lote del inventario
+     * @return Optional con los datos y URLs de la compra, vacío si no existe
+     */
+    @Transactional(readOnly = true)
+    public Optional<CompraDocumentosDTO> buscarDocumentosPorNroFactura(String nroFactura) {
+        return compraRepository.findByNroFactura(nroFactura)
+                .map(compra -> CompraDocumentosDTO.builder()
+                        .compraId(compra.getCompraId())
+                        .nroFactura(compra.getNroFactura())
+                        .proveedor(compra.getProveedor())
+                        .fechaCompra(compra.getFechaCompra())
+                        .urlFactura(compra.getRutaArchivoFactura())
+                        .urlCotizacion(compra.getRutaArchivoCotizacion())
+                        .subtotal(compra.getSubtotal())
+                        .igv(compra.getIgv())
+                        .montoTotal(compra.getMontoTotal())
+                        .build());
+    }
+
+    // ── Helpers privados ──────────────────────────────────────────────────────
+
     private void actualizarInventarioCentral(CatalogoEpp epp,
                                              CatalogoTalla talla,
                                              EstadoEpp estadoEnStock,
                                              CompraRequestDTO request,
                                              DetalleCompraRequestDTO itemDTO) {
 
-        Optional<InventarioCentral> inventarioOpt = talla != null
+        java.util.Optional<InventarioCentral> inventarioOpt = talla != null
                 ? inventarioCentralRepository.findByEppAndLoteAndEstadoAndTalla(
-                        epp, request.getNroFactura(), estadoEnStock, talla)
+                epp, request.getNroFactura(), estadoEnStock, talla)
                 : inventarioCentralRepository.findByEppAndLoteAndEstadoSinTalla(
-                        epp, request.getNroFactura(), estadoEnStock);
+                epp, request.getNroFactura(), estadoEnStock);
 
         if (inventarioOpt.isPresent()) {
             InventarioCentral inv = inventarioOpt.get();
