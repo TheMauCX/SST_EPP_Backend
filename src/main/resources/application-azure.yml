@@ -1,0 +1,26 @@
+# ============================================================
+# PERFIL: azure  →  BD Azure PostgreSQL + Azure Blob Storage
+# Activar: --spring.profiles.active=azure
+# Requiere variables de entorno:
+#   AZURE_DB_HOST
+#   AZURE_DB_NAME
+#   AZURE_DB_USER
+#   AZURE_DB_PASSWORD
+#   AZURE_STORAGE_CONNECTION_STRING
+# ============================================================
+spring:
+  datasource:
+    url: jdbc:postgresql://${AZURE_DB_HOST}:5432/${AZURE_DB_NAME}?sslmode=require
+    username: ${AZURE_DB_USER}
+    password: ${AZURE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5       # Azure dev tiene límite de conexiones
+      minimum-idle: 1
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+azure:
+  storage:
+    connection-string: ${AZURE_STORAGE_CONNECTION_STRING}
+    container-name: media
