@@ -16,6 +16,10 @@ import pe.edu.upeu.epp.entity.*;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.*;
 
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+import org.xhtmlrenderer.pdf.ITextRenderer;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -52,6 +56,7 @@ public class ReporteService {
     private final InventarioCentralRepository       inventarioCentralRepository;
     private final DetalleCompraRepository           detalleCompraRepository;
     private final CatalogoEppRepository             catalogoEppRepository;
+    private final TemplateEngine                    templateEngine;
 
     // ════════════════════════════════════════════════════════════════════════
     // HU-6: Ficha de trabajador
@@ -120,51 +125,19 @@ public class ReporteService {
     @Transactional(readOnly = true)
     public byte[] generarFichaTrabajadorPdf(Integer trabajadorId) {
         FichaTrabajadorResponseDTO ficha = generarFichaTrabajador(trabajadorId);
-        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            PDPage page = new PDPage(PDRectangle.A4);
-            doc.addPage(page);
-            PDType1Font bold   = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
-            PDType1Font normal = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                float margin = 50, y = PDRectangle.A4.getHeight() - margin, lh = 16;
-                cs.beginText(); cs.setFont(bold, 16); cs.newLineAtOffset(margin, y);
-                cs.showText("FICHA DE EPPs - " + ficha.getNombreCompleto().toUpperCase()); cs.endText();
-                y -= lh * 1.5f;
-                cs.setFont(normal, 11);
-                for (String d : new String[]{"DNI: " + ficha.getDni(),
-                        "Cargo: " + (ficha.getCargo() != null ? ficha.getCargo() : "-"),
-                        "Área: "  + (ficha.getAreaNombre() != null ? ficha.getAreaNombre() : "-"),
-                        "Total de entregas: " + ficha.getTotalEntregas()}) {
-                    cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText(d); cs.endText(); y -= lh;
-                }
-                y -= lh;
-                for (FichaTrabajadorResponseDTO.EntregaFichaDTO e : ficha.getEntregas()) {
-                    if (y < 100) break;
-                    cs.setFont(bold, 11); cs.beginText(); cs.newLineAtOffset(margin, y);
-                    String f = e.getFechaEntrega() != null ? e.getFechaEntrega().toString().substring(0, 16) : "-";
-                    cs.showText("Entrega #" + e.getEntregaId() + "  |  " + f + "  |  " + e.getTipoEntrega());
-                    cs.endText(); y -= lh;
-                    if (e.getEntregadoPor() != null) {
-                        cs.setFont(normal, 10); cs.beginText(); cs.newLineAtOffset(margin + 10, y);
-                        cs.showText("Entregado por: " + e.getEntregadoPor()); cs.endText(); y -= lh;
-                    }
-                    for (FichaTrabajadorResponseDTO.ItemFichaDTO it : e.getItems()) {
-                        cs.setFont(normal, 10); cs.beginText(); cs.newLineAtOffset(margin + 20, y);
-                        String t = it.getTalla() != null ? " | Talla: " + it.getTalla() : "";
-                        String c = it.getCostoUnitario() != null
-                                ? " | S/. " + it.getCostoUnitario().setScale(2, RoundingMode.HALF_UP) : "";
-                        cs.showText("• " + it.getNombreEpp() + t + " | Cant: " + it.getCantidad() + c);
-                        cs.endText(); y -= lh;
-                    }
-                    y -= lh * 0.5f;
-                }
-                cs.setFont(normal, 9); cs.beginText(); cs.newLineAtOffset(margin, 40);
-                cs.showText("Generado el: " + LocalDateTime.now().toString().substring(0, 19) +
-                        "  |  Sistema de Gestión SST - UPEU"); cs.endText();
-            }
-            doc.save(baos);
+
+        Context context = new Context();
+        context.setVariable("ficha", ficha);
+
+        String html = templateEngine.process("ficha-trabajador", context);
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            ITextRenderer renderer = new ITextRenderer();
+            renderer.setDocumentFromString(html);
+            renderer.layout();
+            renderer.createPDF(baos);
             return baos.toByteArray();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new BusinessException("Error al generar el PDF: " + e.getMessage());
         }
     }

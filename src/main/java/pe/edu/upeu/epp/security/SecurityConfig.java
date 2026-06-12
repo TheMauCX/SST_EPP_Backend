@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/v1/test-azure/**").permitAll()
+                .requestMatchers("/api/v1/reportes/trabajadores/*/ficha/pdf").permitAll()
 
                 // ── Todo lo demás: requiere SUPERVISOR_SST o ADMINISTRADOR_SISTEMA ─
                 // Se usa una sola regla global para evitar inconsistencias.
@@ -105,6 +106,7 @@ public class SecurityConfig {
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(Arrays.asList("Content-Disposition"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

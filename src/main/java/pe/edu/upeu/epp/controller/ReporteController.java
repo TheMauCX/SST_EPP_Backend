@@ -61,6 +61,7 @@ public class ReporteController {
     @GetMapping(value = "/trabajadores/{trabajadorId}/ficha/pdf",
                 produces = MediaType.APPLICATION_PDF_VALUE)
     @Operation(summary = "Ficha de EPPs de un trabajador (PDF descargable)")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<byte[]> fichaTrabajadorPdf(@PathVariable Integer trabajadorId) {
         byte[] pdf = reporteService.generarFichaTrabajadorPdf(trabajadorId);
         return ResponseEntity.ok()

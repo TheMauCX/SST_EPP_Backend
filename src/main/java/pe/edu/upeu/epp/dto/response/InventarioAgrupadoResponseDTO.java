@@ -32,7 +32,7 @@ import java.util.List;
  */
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class InventarioAgrupadoResponseDTO {
-
+        
     private Integer eppId;
     private String  eppNombre;
     private CatalogoEpp.TipoUso tipoUso;
@@ -46,6 +46,7 @@ public class InventarioAgrupadoResponseDTO {
 
     // Totales del grupo
     private Integer totalCantidad;
+    private BigDecimal costoPromedio;   // promedio de costoUnitario del grupo
 
     // Umbrales del catálogo (aplican a todos los registros del grupo)
     private Integer cantidadMinima;

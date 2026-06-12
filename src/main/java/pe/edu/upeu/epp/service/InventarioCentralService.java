@@ -15,8 +15,10 @@ import pe.edu.upeu.epp.entity.*;
 import pe.edu.upeu.epp.exception.BusinessException;
 import pe.edu.upeu.epp.repository.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -91,7 +93,13 @@ public class InventarioCentralService {
      * Cada grupo expone todas las tallas con sus cantidades y costos.
      */
     @Transactional(readOnly = true)
-    public Page<InventarioAgrupadoResponseDTO> listarAgrupadoPaginado(Pageable pageable) {
+    public Page<InventarioAgrupadoResponseDTO> listarAgrupadoPaginado(
+            Pageable pageable,
+            String proveedorFiltro,
+            String fechaInicioStr,
+            String fechaFinStr,
+            Double costoMin,
+            Double costoMax) {
         List<InventarioCentral> todos = inventarioCentralRepository.findAll();
 
         Map<String, List<InventarioCentral>> grupos = todos.stream()
@@ -100,6 +108,21 @@ public class InventarioCentralService {
                         + "||" + Objects.toString(inv.getProveedor(), "")
                         + "||" + Objects.toString(inv.getLote(), "")));
 
+        // ── Parseo de fechas ──────────────────────────────────────────────────
+        LocalDate fechaInicio = null;
+        LocalDate fechaFin    = null;
+        try {
+            if (fechaInicioStr != null && !fechaInicioStr.isBlank())
+                fechaInicio = LocalDate.parse(fechaInicioStr);
+            if (fechaFinStr != null && !fechaFinStr.isBlank())
+                fechaFin = LocalDate.parse(fechaFinStr);
+        } catch (DateTimeParseException e) {
+            log.warn("Formato de fecha inválido en filtro de inventario agrupado: {}", e.getMessage());
+        }
+
+        final LocalDate fInicio = fechaInicio;
+        final LocalDate fFin    = fechaFin;
+
         List<InventarioAgrupadoResponseDTO> agrupados = grupos.values().stream()
                 .map(registros -> {
                     InventarioCentral primero = registros.get(0);
@@ -107,6 +130,12 @@ public class InventarioCentralService {
 
                     int totalCantidad = registros.stream()
                             .mapToInt(r -> r.getCantidadActual() != null ? r.getCantidadActual() : 0).sum();
+
+                    // Costo promedio del grupo (para filtro de costos)
+                    OptionalDouble costoPromedio = registros.stream()
+                            .filter(r -> r.getCostoUnitario() != null)
+                            .mapToDouble(r -> r.getCostoUnitario().doubleValue())
+                            .average();
 
                     List<InventarioAgrupadoResponseDTO.DetalleTallaDTO> detalles = registros.stream()
                             .map(r -> InventarioAgrupadoResponseDTO.DetalleTallaDTO.builder()
@@ -122,6 +151,10 @@ public class InventarioCentralService {
 
                     boolean necesita = epp.getCantidadMinima() != null && totalCantidad <= epp.getCantidadMinima();
 
+                    // costoPromedio calculado como BigDecimal para el DTO
+                    BigDecimal costoPromedioDecimal = costoPromedio.isPresent()
+                            ? BigDecimal.valueOf(costoPromedio.getAsDouble()) : null;
+
                     return InventarioAgrupadoResponseDTO.builder()
                             .eppId(epp.getEppId()).eppNombre(epp.getNombreEpp())
                             .tipoUso(epp.getTipoUso()).color(epp.getColor())
@@ -129,11 +162,32 @@ public class InventarioCentralService {
                             .fechaAdquisicion(primero.getFechaAdquisicion())
                             .fechaVencimiento(primero.getFechaVencimiento())
                             .totalCantidad(totalCantidad)
+                            .costoPromedio(costoPromedioDecimal)
                             .cantidadMinima(epp.getCantidadMinima())
                             .cantidadMaxima(epp.getCantidadMaxima())
                             .necesitaReposicion(necesita)
                             .detallesPorTalla(detalles)
                             .build();
+                })
+                // ── Aplicar filtros ───────────────────────────────────────────────────
+                .filter(dto -> {
+                    // Filtro por proveedor (parcial, sin distinción de mayúsculas)
+                    if (proveedorFiltro != null && !proveedorFiltro.isBlank()) {
+                        if (dto.getProveedor() == null) return false;
+                        if (!dto.getProveedor().toLowerCase().contains(proveedorFiltro.trim().toLowerCase()))
+                            return false;
+                    }
+                    // Filtro por fecha de adquisición (rango)
+                    if (fInicio != null && dto.getFechaAdquisicion() != null
+                            && dto.getFechaAdquisicion().isBefore(fInicio)) return false;
+                    if (fFin != null && dto.getFechaAdquisicion() != null
+                            && dto.getFechaAdquisicion().isAfter(fFin)) return false;
+                    // Filtro por costo promedio
+                    if (costoMin != null && dto.getCostoPromedio() != null
+                            && dto.getCostoPromedio().doubleValue() < costoMin) return false;
+                    if (costoMax != null && dto.getCostoPromedio() != null
+                            && dto.getCostoPromedio().doubleValue() > costoMax) return false;
+                    return true;
                 })
                 .sorted(Comparator.comparing(InventarioAgrupadoResponseDTO::getEppNombre))
                 .collect(Collectors.toList());

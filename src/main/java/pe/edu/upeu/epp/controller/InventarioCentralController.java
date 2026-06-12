@@ -54,13 +54,21 @@ public class InventarioCentralController {
 
     @GetMapping("/agrupado")
     @Operation(
-            summary = "Inventario agrupado (paginado)",
+            summary = "Inventario agrupado (paginado, con filtros)",
             description = "Consolida registros por EPP+lote+proveedor. " +
-                    "Cada objeto incluye detallesPorTalla con cantidad y costo unitario por talla. " +
-                    "Soporta paginación estándar: ?page=0&size=10")
+                    "Filtros opcionales: proveedor (texto parcial), " +
+                    "fechaInicio/fechaFin (rango fecha adquisición ISO: yyyy-MM-dd), " +
+                    "costoMin/costoMax (rango de costo unitario). " +
+                    "Paginación: ?page=0&size=10")
     public ResponseEntity<Page<InventarioAgrupadoResponseDTO>> listarAgrupado(
-            @PageableDefault(size = 10, sort = "eppNombre") Pageable pageable) {
-        return ResponseEntity.ok(inventarioCentralService.listarAgrupadoPaginado(pageable));
+            @PageableDefault(size = 10, sort = "eppNombre") Pageable pageable,
+            @RequestParam(required = false) String proveedor,
+            @RequestParam(required = false) String fechaInicio,
+            @RequestParam(required = false) String fechaFin,
+            @RequestParam(required = false) Double costoMin,
+            @RequestParam(required = false) Double costoMax) {
+        return ResponseEntity.ok(inventarioCentralService.listarAgrupadoPaginado(
+                pageable, proveedor, fechaInicio, fechaFin, costoMin, costoMax));
     }
 
     @GetMapping("/epp/{eppId}")
