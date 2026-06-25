@@ -1,0 +1,39 @@
+# =====================================================
+# .dockerignore — excluye archivos del contexto de build
+# Esto evita filtrar secretos y acelera el build
+# =====================================================
+
+# Secretos — NUNCA deben entrar al contexto Docker
+.env
+.env.*
+!.env.example
+
+# Artefactos de compilación previos (se compilan dentro del contenedor)
+target/
+
+# Control de versiones
+.git/
+.gitignore
+.gitattributes
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Archivos de documentación
+HELP.md
+README.md
+*.md
+
+# Uploads locales (se manejan en Azure Blob Storage en producción)
+uploads/
+
+# Scripts de base de datos (no deben estar en el contenedor)
+scripts/
+
+# Archivos de sistema Windows/Mac
+Thumbs.db
+.DS_Store

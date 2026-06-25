@@ -1,0 +1,29 @@
+# =====================================================================
+# docker-compose.azure.yml — STAGING / PRUEBA LOCAL CON AZURE DB
+# Levanta SOLO el backend, conectado a Azure PostgreSQL Flexible Server
+# y Azure Blob Storage (igual que producción pero corriendo local)
+#
+# Uso: docker compose -f docker-compose.azure.yml up -d
+# Requiere: .env con variables AZURE_* configuradas
+# =====================================================================
+version: '3.8'
+
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: epp_backend_azure
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # Override explícito del perfil — siempre azure en este compose
+      SPRING_PROFILES_ACTIVE: azure
+      # JVM tuning (ajustable según el plan de Azure Container Apps)
+      JAVA_OPTS: "-Xms256m -Xmx512m -Djava.security.egd=file:/dev/./urandom"
+    restart: unless-stopped
+
+# Sin volumes ni networks adicionales — la DB está en Azure
