@@ -1,13 +1,21 @@
+# =====================================================================
+# docker-compose.yml — DESARROLLO LOCAL
+# Levanta PostgreSQL + Backend Spring Boot en Docker
+# Uso: docker compose up -d
+# Variables: copiar .env.example a .env y ajustar con perfil=local
+# =====================================================================
 version: '3.8'
 
 services:
+
+  # Base de datos PostgreSQL (con TimescaleDB para series temporales)
   postgres:
     image: timescale/timescaledb:2.11.0-pg15
     container_name: epp_postgres
     environment:
       POSTGRES_DB: epp_db
       POSTGRES_USER: epp_user
-      POSTGRES_PASSWORD: password123  # Contraseña simple
+      POSTGRES_PASSWORD: password123
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5433:5432"
@@ -20,6 +28,36 @@ services:
       retries: 5
     networks:
       - epp_network
+
+  # Backend Spring Boot
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: epp_backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Apunta al servicio postgres definido arriba (nombre del servicio = host en la red Docker)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/epp_db
+      SPRING_DATASOURCE_USERNAME: epp_user
+      SPRING_DATASOURCE_PASSWORD: password123
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      # Mail (opcional en local, puede dejarse vacío si no se usa)
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      # Azure Blob Storage (puede apuntar al real aunque sea local)
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      # JVM tuning para desarrollo
+      JAVA_OPTS: "-Xms256m -Xmx512m -Djava.security.egd=file:/dev/./urandom"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - epp_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

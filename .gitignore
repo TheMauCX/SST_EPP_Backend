@@ -32,4 +32,10 @@ build/
 ### VS Code ###
 .vscode/
 
+# Secretos y entorno — NUNCA subir al repo
 .env
+.env.*
+!.env.example
+
+# Uploads locales (en producción se usan Azure Blob Storage)
+uploads/
