@@ -1,0 +1,18 @@
+# ============================================================
+# PERFIL: local  →  BD Docker (localhost:5433)
+# Activar: --spring.profiles.active=local
+# ============================================================
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/epp_db
+    username: epp_user
+    password: password123
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+azure:
+  storage:
+    connection-string: ${AZURE_STORAGE_CONNECTION_STRING}
+    container-name: media

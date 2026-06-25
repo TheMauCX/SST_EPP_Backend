@@ -4,7 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import pe.edu.upeu.epp.entity.Trabajador;
 import pe.edu.upeu.epp.entity.Usuario;
 
 import java.util.List;
@@ -15,7 +14,6 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
     Optional<Usuario> findByNombreUsuario(String nombreUsuario);
     Optional<Usuario> findByEmail(String email);
-    Optional<Usuario> findByTrabajador(Trabajador trabajador);
 
     @Query("SELECT u FROM Usuario u " +
             "LEFT JOIN FETCH u.roles " +
@@ -25,7 +23,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     @Query("SELECT u FROM Usuario u JOIN u.roles r WHERE r.nombreRol = :nombreRol AND u.activo = true")
     List<Usuario> findByRoles_NombreRol(@Param("nombreRol") String nombreRol);
-
+    Optional<Usuario> findByResetToken(String resetToken);
     boolean existsByNombreUsuario(String nombreUsuario);
     boolean existsByEmail(String email);
 }

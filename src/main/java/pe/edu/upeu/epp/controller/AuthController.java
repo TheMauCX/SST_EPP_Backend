@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import pe.edu.upeu.epp.dto.request.ForgotPasswordRequestDTO;
 import pe.edu.upeu.epp.dto.request.LoginRequestDTO;
 import pe.edu.upeu.epp.dto.request.RefreshTokenRequestDTO;
+import pe.edu.upeu.epp.dto.request.ResetPasswordRequestDTO;
 import pe.edu.upeu.epp.dto.response.AuthResponseDTO;
 import pe.edu.upeu.epp.service.AuthService;
 /**
@@ -63,5 +65,26 @@ public class AuthController {
             authService.logout(authentication.getName());
         }
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    /**
+     * Endpoint para solicitar el restablecimiento de contraseña.
+     * Recibe un DTO con el username o email.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
+        authService.forgotPassword(request);
+        // Siempre devolvemos OK para no revelar si un email existe o no
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Endpoint para establecer la nueva contraseña.
+     * Recibe el token (del enlace) y las nuevas contraseñas.
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok().build();
     }
 }

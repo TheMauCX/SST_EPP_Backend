@@ -8,6 +8,16 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Usuario del sistema (exclusivamente personal SST).
+ *
+ * Sprint 4b:
+ *   - Se elimina la relación @OneToOne con Trabajador.
+ *     Los usuarios del sistema son supervisores SST, no están vinculados
+ *     a registros de trabajadores operativos.
+ *   - El campo trabajador_id se deja en BD como nullable por compatibilidad
+ *     histórica, pero ya no se mapea como relación JPA.
+ */
 @Entity
 @Table(name = "usuario", schema = "epp", indexes = {
         @Index(name = "idx_usuario_nombre", columnList = "nombre_usuario"),
@@ -34,9 +44,9 @@ public class Usuario {
     @Column(name = "email", unique = true, length = 100)
     private String email;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trabajador_id", unique = true)
-    private Trabajador trabajador;
+    /** Nombre para mostrar en la UI (nombre completo del supervisor). */
+    @Column(name = "nombre_completo", length = 150)
+    private String nombreCompleto;
 
     @Column(name = "activo")
     private Boolean activo = true;
@@ -53,11 +63,17 @@ public class Usuario {
     @Column(name = "bloqueado_hasta")
     private LocalDateTime bloqueadoHasta;
 
+    @Column(name = "reset_token")
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "usuario_rol",
             schema = "epp",
-            joinColumns = @JoinColumn(name = "usuario_id"),
+            joinColumns        = @JoinColumn(name = "usuario_id"),
             inverseJoinColumns = @JoinColumn(name = "rol_id")
     )
     @Builder.Default

@@ -1,0 +1,198 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Ficha de Trabajador</title>
+    <style type="text/css">
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 10pt;
+                color: #666;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333333;
+            line-height: 1.5;
+            font-size: 12pt;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #0056b3;
+            margin: 0;
+            font-size: 24pt;
+        }
+        .header p {
+            color: #666666;
+            margin: 5px 0 0 0;
+            font-size: 10pt;
+        }
+        .info-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .info-table td {
+            padding: 5px;
+            vertical-align: top;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+            width: 120px;
+        }
+        .entrega-container {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        .entrega-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-left: 4px solid #0056b3;
+            margin-bottom: 10px;
+        }
+        .entrega-header h3 {
+            margin: 0;
+            font-size: 14pt;
+            color: #212529;
+        }
+        .entrega-header p {
+            margin: 2px 0 0 0;
+            font-size: 10pt;
+            color: #495057;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .items-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+            font-size: 11pt;
+        }
+        .items-table td {
+            font-size: 11pt;
+        }
+        .text-right {
+            text-align: right !important;
+        }
+        .text-center {
+            text-align: center !important;
+        }
+        .badge {
+            background-color: #17a2b8;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9pt;
+            font-weight: bold;
+        }
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+            border: 1px dashed #dee2e6;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 9pt;
+            color: #adb5bd;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>FICHA DE EPPs</h1>
+        <p>Sistema de Gestión SST - UPEU</p>
+    </div>
+
+    <div class="info-section">
+        <table class="info-table">
+            <tr>
+                <td class="info-label">Trabajador:</td>
+                <td style="font-weight: bold; font-size: 14pt;" th:text="${ficha.nombreCompleto}">Nombre del Trabajador</td>
+                <td class="info-label">Total Entregas:</td>
+                <td th:text="${ficha.totalEntregas}">0</td>
+            </tr>
+            <tr>
+                <td class="info-label">DNI:</td>
+                <td th:text="${ficha.dni}">12345678</td>
+                <td class="info-label">Área:</td>
+                <td th:text="${ficha.areaNombre != null ? ficha.areaNombre : '-'}">Área</td>
+            </tr>
+            <tr>
+                <td class="info-label">Cargo:</td>
+                <td colspan="3" th:text="${ficha.cargo != null ? ficha.cargo : '-'}">Cargo</td>
+            </tr>
+        </table>
+    </div>
+
+    <div th:if="${#lists.isEmpty(ficha.entregas)}" class="empty-state">
+        No se registran entregas de EPP para este trabajador.
+    </div>
+
+    <div th:each="entrega : ${ficha.entregas}" class="entrega-container">
+        <div class="entrega-header">
+            <h3>
+                Entrega #<span th:text="${entrega.entregaId}">1</span> 
+                <span class="badge" th:text="${entrega.tipoEntrega}" style="float: right;">TIPO</span>
+            </h3>
+            <p>
+                <strong>Fecha:</strong> <span th:text="${#temporals.format(entrega.fechaEntrega, 'dd/MM/yyyy HH:mm')}">01/01/2026 00:00</span> |
+                <strong>Entregado por:</strong> <span th:text="${entrega.entregadoPor != null ? entrega.entregadoPor : 'Sistema'}">Usuario</span>
+            </p>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>EPP</th>
+                    <th class="text-center">Talla</th>
+                    <th class="text-center">Cant.</th>
+                    <th class="text-right">Costo Unit. (S/.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="item : ${entrega.items}">
+                    <td th:text="${item.nombreEpp}">Casco</td>
+                    <td class="text-center" th:text="${item.talla != null ? item.talla : '-'}">M</td>
+                    <td class="text-center" th:text="${item.cantidad}">1</td>
+                    <td class="text-right" th:text="${item.costoUnitario != null ? #numbers.formatDecimal(item.costoUnitario, 1, 2) : '-'}">10.00</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        Documento generado el <span th:text="${#temporals.format(T(java.time.LocalDateTime).now(), 'dd/MM/yyyy HH:mm:ss')}"></span>
+    </div>
+
+</body>
+</html>
