@@ -14,5 +14,7 @@ public interface CatalogoTallaRepository extends JpaRepository<CatalogoTalla, In
 
     boolean existsByNombre(String nombre);
 
+    boolean existsByNombreAndTallaIdNot(String nombre, Integer tallaId);
+
     List<CatalogoTalla> findAllByOrderByOrdenVisualizacionAscNombreAsc();
 }

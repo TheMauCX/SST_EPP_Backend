@@ -43,6 +43,15 @@ public class CatalogoTallaController {
         return ResponseEntity.ok(tallaService.obtenerPorId(id));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Actualizar talla", description = "Edita el nombre, descripción y orden de visualización de una talla existente")
+    public ResponseEntity<CatalogoTallaResponseDTO> actualizar(
+            @PathVariable Integer id,
+            @Valid @RequestBody CatalogoTallaRequestDTO request) {
+        return ResponseEntity.ok(tallaService.actualizar(id, request));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
     @Operation(summary = "Eliminar talla")

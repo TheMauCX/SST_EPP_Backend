@@ -47,6 +47,24 @@ public class CatalogoTallaService {
     }
 
     @Transactional
+    public CatalogoTallaResponseDTO actualizar(Integer id, CatalogoTallaRequestDTO request) {
+        CatalogoTalla talla = tallaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Talla no encontrada con ID: " + id));
+
+        String nuevoNombre = request.getNombre().toUpperCase();
+        if (tallaRepository.existsByNombreAndTallaIdNot(nuevoNombre, id)) {
+            throw new BusinessException("Ya existe una talla con el nombre: " + request.getNombre());
+        }
+
+        talla.setNombre(nuevoNombre);
+        talla.setDescripcion(request.getDescripcion());
+        talla.setOrdenVisualizacion(request.getOrdenVisualizacion());
+
+        log.info("Talla actualizada ID: {} → nombre: {}", id, nuevoNombre);
+        return mapToDTO(tallaRepository.save(talla));
+    }
+
+    @Transactional
     public void eliminar(Integer id) {
         if (!tallaRepository.existsById(id)) {
             throw new EntityNotFoundException("Talla no encontrada con ID: " + id);
