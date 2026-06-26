@@ -1,6 +1,7 @@
 package pe.edu.upeu.epp.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -45,6 +46,15 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
+    /**
+     * Orígenes CORS permitidos, separados por coma.
+     * En desarrollo local se usa el valor por defecto.
+     * En Azure Container Apps se inyecta la variable ALLOWED_ORIGINS con las URLs reales.
+     * Ejemplo: https://sst-epp-frontend.azurecontainerapps.io,https://app.upeu.edu.pe
+     */
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5354,http://localhost:5000,http://localhost:4200,http://10.0.2.2:8080,http://172.17.25.28:8080}")
+    private String allowedOrigins;
+
     // Roles activos en el MVP
     private static final String SUPERVISOR = "SUPERVISOR_SST";
     private static final String ADMIN      = "ADMINISTRADOR_SISTEMA";
@@ -61,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/v1/test-azure/**").permitAll()
+                .requestMatchers("/api/v1/reportes/trabajadores/*/ficha").permitAll()
                 .requestMatchers("/api/v1/reportes/trabajadores/*/ficha/pdf").permitAll()
 
                 // ── Todo lo demás: requiere SUPERVISOR_SST o ADMINISTRADOR_SISTEMA ─
@@ -96,14 +107,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:5354",
-                "http://localhost:5000",
-                "https://app.upeu.edu.pe",
-                "http://10.0.2.2:8080",
-                "http://172.17.25.28:8080"
-        ));
+
+        // Parsear la lista de orígenes separada por coma (inyectada por env var ALLOWED_ORIGINS)
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+        config.setAllowedOrigins(origins);
+
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(Arrays.asList("Content-Disposition"));

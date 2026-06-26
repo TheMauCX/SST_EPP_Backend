@@ -21,7 +21,6 @@ import java.util.List;
 @Tag(name = "Reportes y Dashboard",
      description = "Indicadores financieros, estadísticas de consumo y análisis de inventario EPP")
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
 public class ReporteController {
 
     private final ReporteService reporteService;
@@ -29,6 +28,7 @@ public class ReporteController {
     // ── HU-14: Dashboard de gastos ───────────────────────────────────────
 
     @GetMapping("/gastos")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Gastos mensuales",
             description = "Gasto mensual en EPPs = SUM(cantidad_entregada × precio_unitario) por mes.")
@@ -41,6 +41,7 @@ public class ReporteController {
     // ── HU-15: Rotación ──────────────────────────────────────────────────
 
     @GetMapping("/rotacion")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Rotación y EPPs inmovilizados",
             description = "Top EPPs más entregados y EPPs sin salidas en el período.")
@@ -61,7 +62,6 @@ public class ReporteController {
     @GetMapping(value = "/trabajadores/{trabajadorId}/ficha/pdf",
                 produces = MediaType.APPLICATION_PDF_VALUE)
     @Operation(summary = "Ficha de EPPs de un trabajador (PDF descargable)")
-    @PreAuthorize("permitAll()")
     public ResponseEntity<byte[]> fichaTrabajadorPdf(@PathVariable Integer trabajadorId) {
         byte[] pdf = reporteService.generarFichaTrabajadorPdf(trabajadorId);
         return ResponseEntity.ok()
@@ -81,6 +81,7 @@ public class ReporteController {
      * Retorna lista ordenada de mayor a menor precio.
      */
     @GetMapping("/estadisticas/precios-epp")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Precios actuales de todos los EPPs",
             description = "Devuelve el precio unitario del lote más reciente de cada EPP. " +
@@ -94,6 +95,7 @@ public class ReporteController {
      * Cada punto representa una compra distinta (lote diferente).
      */
     @GetMapping("/estadisticas/historial-precios/{eppId}")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Historial de precios de un EPP",
             description = "Muestra cómo ha evolucionado el precio unitario de un EPP " +
@@ -108,6 +110,7 @@ public class ReporteController {
      * Cuánto dinero está inmovilizado en stock (cantidad × costo unitario).
      */
     @GetMapping("/estadisticas/valor-inventario")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Valorización del inventario central",
             description = "Calcula el valor total del stock actual: SUM(cantidad × costo_unitario) " +
@@ -121,6 +124,7 @@ public class ReporteController {
      * Permite identificar quién consume más presupuesto.
      */
     @GetMapping("/estadisticas/trabajadores-mayor-gasto")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "Trabajadores que más gastan en EPPs",
             description = "Ranking de trabajadores por el valor total de EPPs recibidos " +
@@ -136,6 +140,7 @@ public class ReporteController {
      * Diferente a rotación — mide compras, no entregas.
      */
     @GetMapping("/estadisticas/frecuencia-compras")
+    @PreAuthorize("hasAnyRole('SUPERVISOR_SST', 'ADMINISTRADOR_SISTEMA')")
     @Operation(
             summary = "EPPs más comprados (frecuencia en facturas)",
             description = "Muestra cuántas veces aparece cada EPP en facturas de compra, " +

@@ -22,6 +22,8 @@ services:
     environment:
       # Override explícito del perfil — siempre azure en este compose
       SPRING_PROFILES_ACTIVE: azure
+      # CORS: orígenes permitidos (completar con la URL del frontend en Azure)
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5354}
       # JVM tuning (ajustable según el plan de Azure Container Apps)
       JAVA_OPTS: "-Xms256m -Xmx512m -Djava.security.egd=file:/dev/./urandom"
     restart: unless-stopped
