@@ -73,6 +73,12 @@ public class NormaEppService {
     }
 
     @Transactional(readOnly = true)
+    public List<NormaEppResponseDTO> listarTodas() {
+        return normaEppRepository.findAll().stream()
+                .map(this::toDTO).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<NormaEppResponseDTO> listarPorOrganismo(String organismoStr) {
         Organismo organismo = Organismo.valueOf(organismoStr.toUpperCase());
         return normaEppRepository.findByOrganismoAndActivoTrue(organismo).stream()

@@ -33,6 +33,14 @@ public class NormaEppController {
         return ResponseEntity.ok(normaEppService.listarActivas());
     }
 
+    @GetMapping("/todas")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Listar todas las normas (ADMIN)",
+               description = "Devuelve todas las normas (activas e inactivas).")
+    public ResponseEntity<List<NormaEppResponseDTO>> listarTodas() {
+        return ResponseEntity.ok(normaEppService.listarTodas());
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Detalle de norma",
                description = "Incluye la descripción completa para el panel desplegable en la UI.")
