@@ -24,3 +24,10 @@ azure:
   storage:
     connection-string: ${AZURE_STORAGE_CONNECTION_STRING}
     container-name: media
+
+# ── CORS ──────────────────────────────────────────────────────────────
+# Orígenes permitidos: se inyecta como variable de entorno en Azure Container Apps
+# Formato: URL1,URL2,URL3 (separadas por coma, sin espacios)
+# Ejemplo: https://sst-epp-frontend.azurecontainerapps.io,https://app.upeu.edu.pe
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5354}
