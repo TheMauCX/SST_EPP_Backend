@@ -84,4 +84,13 @@ public class NormaEppController {
         normaEppService.desactivar(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{id}/estado")
+    @PreAuthorize("hasRole('ADMINISTRADOR_SISTEMA')")
+    @Operation(summary = "Activar/Desactivar norma (ADMIN)",
+               description = "Cambia el estado de la norma. activo=true reactiva, activo=false desactiva.")
+    public ResponseEntity<NormaEppResponseDTO> cambiarEstado(
+            @PathVariable Integer id, @RequestParam boolean activo) {
+        return ResponseEntity.ok(normaEppService.cambiarEstado(id, activo));
+    }
 }

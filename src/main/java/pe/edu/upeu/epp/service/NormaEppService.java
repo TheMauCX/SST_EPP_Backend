@@ -66,6 +66,15 @@ public class NormaEppService {
         normaEppRepository.save(norma);
     }
 
+    /** Activa o desactiva una norma según el flag recibido y devuelve el estado resultante. */
+    @Transactional
+    public NormaEppResponseDTO cambiarEstado(Integer id, boolean activo) {
+        NormaEpp norma = normaEppRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Norma no encontrada: " + id));
+        norma.setActivo(activo);
+        return toDTO(normaEppRepository.save(norma));
+    }
+
     @Transactional(readOnly = true)
     public List<NormaEppResponseDTO> listarActivas() {
         return normaEppRepository.findByActivoTrue().stream()
